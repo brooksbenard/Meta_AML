@@ -275,7 +275,7 @@ corrplot(temp_final_odds, is.corr = F, type="upper", order="hclust",tl.col="blac
          sig.level = c(.001, .01, .1), pch.cex = .9, pch.col = "black", na.label = "square", na.label.col = "white")
 dev.off()
 
-write.csv(temp_final, "~/Desktop/MetaAML_results/Figure_2/Fishers/ods_ratio_and_fishers_results.csv", row.names=FALSE)
+write.csv(temp_final, "~/Desktop/MetaAML_results/Figure_2/Fishers/odds_ratio_and_fishers_results.csv", row.names=FALSE)
 
 # volcano plot ####
 
@@ -573,6 +573,12 @@ temp_final_hr = as.data.frame(do.call(rbind, results_list))
 
 # correct for mulitple hypothesis testing
 temp_final_hr$q_value <- p.adjust(temp_final_hr$log_rank_p, method = "fdr")
+
+temp_final_hr[,1:3] = NULL
+temp_final_hr = temp_final_hr %>%
+  select(gene_1, gene_2, gene_tested, everything())
+
+write.csv(temp_final_hr, "~/Desktop/MetaAML_results/Data/Tables/pairwise_mutations_hazard_ratio.csv")
 
 # summary plot of all pairwise survival curves
 plot_list = list.clean(plot_list)
@@ -971,6 +977,7 @@ ggplot(hr_odds, aes(x = log(odds_ratio), y = log(HR))) +
 
 ggsave(filename = "~/Desktop/MetaAML_results/Figure_2/correlation_of_odds_ratio_and_HR_de_novo.pdf", dpi = 300, width = 6, height = 5, units = "in")
 
+write.csv(hr_odds, "~/Desktop/MetaAML_results/Data/Tables/correlation_of_odds_ratio_and_HR_de_novo.pdf.csv")
 
 # test the enrichment of poor outcomes based on odds ratio
 

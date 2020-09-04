@@ -133,6 +133,8 @@ for(i in 1:nrow(genes)){
   # run the Cox model
   mut_pts$Time_to_OS=as.numeric(mut_pts$Time_to_OS)
   
+  mut_pts$Censor = as.numeric(mut_pts$Censor)
+  
   model <- coxph( Surv(Time_to_OS, Censor) ~ hr_stratifier_vaf,
                   data = mut_pts)
   
@@ -265,9 +267,13 @@ ggplot(temp_final, aes(x = reorder(gene, -HR), y = HR, label = temp_final$p_text
         axis.title.y=element_blank()) +
   coord_flip()
 
-
 ggsave(filename = "~/Desktop/MetaAML_results/Figure_3/gene_vaf_discrete_hr_forest_plot_de_novo_30.pdf", dpi = 300, width = 5, height = 7.5, units = "in")
 
+temp_final[,1:3] = NULL
+temp_final = temp_final %>%
+  select(gene, everything())
+
+write.csv(temp_final, "~/Desktop/MetaAML_results/Data/Tables/static_vaf_threshold_survival.csv")
 
 
 

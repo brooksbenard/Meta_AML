@@ -174,6 +174,8 @@ print(a)
 
 ggsave(filename = "~/Desktop/MetaAML_results/Figure_4/order_of_mutations_de_novo.pdf", width = 7.5, height = 6, units = "in")
 
+write.csv("~/Desktop/MetaAML_results/Data/Tables/global_pairwise_vaf_ordering.csv")
+
 # Bradley-Terry ####
 # calculate the mean fraction and confidence interval for each mutation in the pairwise presidence plot by the Bradly-Terry method
 if (!require('BradleyTerryScalable')) install.packages('BradleyTerryScalable'); library('BradleyTerryScalable')
@@ -332,6 +334,7 @@ print(b)
 
 ggsave(filename = "~/Desktop/MetaAML_results/Figure_4/bradley_terry_order_de_novo.pdf", width = 7.5, height = 6, units = "in")
 
+write.csv(BT_MetaAML_mutation_ordering, "~/Desktop/MetaAML_results/Data/Tables/bradley_terry_order_de_novo.pdf.csv")
 
 #define the ordering based on the global pairwise analysis
 sub <- subset(final_data_matrix_2, final_data_matrix_2$mut_freq_gene >= 75 & final_data_matrix_2$Gene != "MLL" & final_data_matrix_2$Subset == "de_novo" & final_data_matrix_2$mut_freq_pt > 1)
@@ -702,7 +705,7 @@ ggsave(filename = "~/Desktop/MetaAML_results/Figure_4/gene_order_hr_forest_plot_
 # mutation categories ####
 # because there are still too few cases on a pairwise basis to perform survival analysis, I will now look at pairwise occurence more broadly in terms of mutation categories
 # sine it appears that epigenetic mutations occur first and proliferation hits last, I will find all patients who have mutations in these two categories, determine the order of aquizition, and performe survival analysis between patients with different order of aquizition
-ddir("~/Desktop/MetaAML_results/Figure_4/survival_by_muation_category_ordering/pngs")
+dir.create("~/Desktop/MetaAML_results/Figure_4/survival_by_muation_category_ordering/pngs")
 
 load("~/Desktop/MetaAML_results/final_data_matrix.RData")
 final_data_matrix_sub <- subset(final_data_matrix, final_data_matrix$Subset == "de_novo")
@@ -893,6 +896,11 @@ for(j in 1:nrow(mut_cat)){
 temp_final_hr_categories_order = as.data.frame(do.call(rbind, results_list))
 temp_final_hr_categories_order$fdr = p.adjust(temp_final_hr_categories_order$p, method = "fdr")
 
+temp_final_hr_categories_order[,1:3] = NULL
+temp_final_hr_categories_order = temp_final_hr_categories_order %>%
+  select(category_1, category_2, everything())
+
+write.csv(temp_final_hr_categories_order, "~/Desktop/Majeti_Lab/Manuscripts/Meta_AML/Files/Results_tables/Tables/survival_by_muation_category_ordering.csv")
 
 # summary plot of all survival curves
 plot_list = list.clean(plot_list)

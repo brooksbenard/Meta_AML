@@ -1307,7 +1307,7 @@ final_data_matrix =  final_data_matrix %>%
   select(Sample,Gene,VAF,variant_type,amino_acid_change,Subset,PatientId,specimenType,Cohort,Censor,Time_to_OS,Sex,Age,Cytogenetics,Risk,BM_blast_percent,PB_blast_percent,WBC,Hemoglobin,LDH,Platelet,PB_wbc_percent,mut_freq_gene,mut_freq_pt,mut_freq_bin,VAF_male_x,mutation_category)
 
 save(final_data_matrix,  file = "~/Desktop/MetaAML_results/final_data_matrix.RData")
-write.table(final_data_matrix,  file = "~/Desktop/MetaAML_results/final_data_matrix.tsv", row.names = F)
+write.csv(final_data_matrix,  file = "~/Desktop/MetaAML_results/final_data_matrix.csv")
 
 # clean up the user's environment from intermediate files
 rm(list=setdiff(ls(), "final_data_matrix"))
