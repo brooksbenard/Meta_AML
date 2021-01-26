@@ -1,14 +1,9 @@
 # ========================================================================================================================================== #
   # Figure_2.R
   # Author : Brooks Benard, bbenard@stanford.edu
-  # Date: 07/06/2020
-  # Description: This script will perform survival and mutation co-occurence analyses as seen in Figure 2 of the manuscript Benard et al. "Clonal architecture and variant allele frequency correlate with clinical outcomes and drug response in acute myeloid leukemia".
+  # Date: 01/25/2021
+  # Description: This script will perform survival and mutation co-occurence analyses as seen in Figure 2 and related suppliments of the manuscript Benard et al. "Clonal architecture and variant allele frequency correlate with clinical outcomes and drug response in acute myeloid leukemia".
   # ========================================================================================================================================== #
-
-# MetaAML_co_occurence_mutual_exlclusive_analysis
-# This script impliments several co-occuring and mutually exclusive mutation analysis packages on MetaAML data
-
-# Co-occurence statistics ####
 
 # ============== #
 # Load libraries #
@@ -25,11 +20,306 @@ if (!require('data.table')) install.packages('data.table'); library('data.table'
 if (!require('epitools')) install.packages('epitools'); library('epitools')
 if (!require('corrplot')) install.packages('corrplot'); library('corrplot')
 if (!require('RColorBrewer')) install.packages('RColorBrewer'); library('RColorBrewer')
+if (!require('rlist')) install.packages('rlist'); library('rlist')
 
-# create the data matrix to use in the function
+dir.create("~/Desktop/MetaAML_results/Figure_2")
+dir.create("~/Desktop/MetaAML_results/Figure_2/Supplimental")
+
 # load from data frame created in the Figure_1 script
 load("~/Desktop/MetaAML_results/final_data_matrix.RData")
 
+#### Individual and Pairwise genotype associations with clinical features ####
+sub = subset(final_data_matrix, mut_freq_gene > 50 & final_data_matrix$Subset == "de_novo" & final_data_matrix$Gene != "MLL")
+
+# make sure that the FLT3 symbols are annotated well
+for(i in 1:nrow(sub)){
+  if(sub$Gene[i] == "FLT3" & sub$variant_type[i] == "ITD"){
+    sub$Gene[i] <- "FLT3-ITD"
+  }
+  if(sub$Gene[i] == "FLT3" & sub$variant_type[i] == "SNV"){
+    sub$Gene[i] <- "FLT3-TKD"
+  }
+  if(sub$Gene[i] == "FLT3" & sub$variant_type[i] == "Deletion"){
+    sub$Gene[i] <- "FLT3-TKD"
+  }
+  if(sub$Gene[i] == "FLT3" & sub$variant_type[i] == "INDEL"){
+    sub$Gene[i] <- "FLT3-ITD"
+  }
+}
+
+genes = data.frame(unique(sub$Gene))
+
+# create directories for linear regression and binary comparisions
+# regression
+dir.create("~/Desktop/MetaAML_results/Data/Figures/VAF_Age/continuous")
+dir.create("~/Desktop/MetaAML_results/Data/Figures/VAF_WBC/continuous")
+dir.create("~/Desktop/MetaAML_results/Data/Figures/VAF_Platelet/continuous")
+dir.create("~/Desktop/MetaAML_results/Data/Figures/VAF_LDH/continuous")
+dir.create("~/Desktop/MetaAML_results/Data/Figures/VAF_Hemoglobin/continuous")
+dir.create("~/Desktop/MetaAML_results/Data/Figures/VAF_PB_blast_percent/continuous")
+dir.create("~/Desktop/MetaAML_results/Data/Figures/VAF_BM_blast_percent/continuous")
+
+# binary
+dir.create("~/Desktop/MetaAML_results/Data/Figures/VAF_Age/discrete")
+dir.create("~/Desktop/MetaAML_results/Data/Figures/VAF_WBC/discrete")
+dir.create("~/Desktop/MetaAML_results/Data/Figures/VAF_Platelet/discrete")
+dir.create("~/Desktop/MetaAML_results/Data/Figures/VAF_LDH/discrete")
+dir.create("~/Desktop/MetaAML_results/Data/Figures/VAF_Hemoglobin/discrete")
+dir.create("~/Desktop/MetaAML_results/Data/Figures/VAF_PB_blast_percent/discrete")
+dir.create("~/Desktop/MetaAML_results/Data/Figures/VAF_BM_blast_percent/discrete")
+
+# summary plots for each variable ####
+sub$VAF <- as.numeric(sub$VAF)
+sub$Age <- as.numeric(sub$Age)
+sub$Hemoglobin <- as.numeric(sub$Hemoglobin)
+sub$Platelet <- as.numeric(sub$Platelet)
+sub$WBC <- as.numeric(sub$WBC)
+sub$LDH <- as.numeric(sub$LDH)
+sub$BM_blast_percent <- as.numeric(sub$BM_blast_percent)
+sub$PB_blast_percent <- as.numeric(sub$PB_blast_percent)
+
+sub$Gene <- as.factor(sub$Gene)
+
+variables = c("Age", "Platelet", "Hemoglobin", "WBC", "LDH", "BM_blast_percent", "PB_blast_percent")
+
+colors = c("#bdbdbd",  "#fb6a4a", "#fe9929", "#d4b9da", "#238443", "#e6ab02", "#8dd3c7")
+
+# age
+ggplot(sub, aes(x=reorder(Gene, -Age, median, na.rm = T), y=Age)) +
+  geom_boxplot(fill="#bdbdbd", color="black") +
+  theme_cowplot(font_size = 15) +
+  theme(axis.text.x = element_text(angle = 45, vjust = .75, 
+                                   size = 10, hjust = .5)) +
+  xlab(label = NULL) +
+  ylab("Age") +
+  geom_hline(yintercept=mean(sub$Age, na.rm = T), linetype="dashed", color = "#99000d")
+
+ggsave(filename = "~/Desktop/MetaAML_results/Figure_2/Supplimental/Age_vs_gene.png", dpi = 300, width = 10, height = 5, units = "in") 
+
+# Platelet
+ggplot(sub, aes(x=reorder(Gene, -Platelet, median, na.rm = T), y=Platelet)) +
+  geom_boxplot(fill="#fb6a4a", color="black") +
+  theme_cowplot(font_size = 15) +
+  theme(axis.text.x = element_text(angle = 45, vjust = .75, 
+                                   size = 10, hjust = .5)) +
+  xlab(label = NULL) +
+  ylab("Platelet (1e3/μL)") +
+  geom_hline(yintercept=median(sub$Platelet, na.rm = T), linetype="dashed", color = "#99000d")+
+  facet_zoom(ylim = c(0, 200))
+
+ggsave(filename = "~/Desktop/MetaAML_results/Figure_2/Supplimental/Platelet_vs_gene.png", dpi = 300, width = 10, height = 5, units = "in") 
+
+# Hemoglobin
+ggplot(sub, aes(x=reorder(Gene, -Hemoglobin, median, na.rm = T), y=Hemoglobin)) +
+  geom_boxplot(fill="#fe9929", color="black") +
+  theme_cowplot(font_size = 15) +
+  theme(axis.text.x = element_text(angle = 45, vjust = .75, 
+                                   size = 10, hjust = .5)) +
+  xlab(label = NULL) +
+  ylab("Hemoglobin (g/dL)") +
+  geom_hline(yintercept=mean(sub$Hemoglobin, na.rm = T), linetype="dashed", color = "#99000d") +
+  facet_zoom(ylim = c(0, 18))
+
+ggsave(filename = "~/Desktop/MetaAML_results/Figure_2/Supplimental/Hemoglobin_vs_gene.png", dpi = 300, width = 10, height = 5, units = "in") 
+
+# WBC
+ggplot(sub, aes(x=reorder(Gene, -WBC, median, na.rm = T), y=WBC)) +
+  geom_boxplot(fill="#d4b9da", color="black") +
+  theme_cowplot(font_size = 15) +
+  theme(axis.text.x = element_text(angle = 45, vjust = .75, 
+                                   size = 10, hjust = .5)) +
+  xlab(label = NULL) +
+  ylab("WBC") +
+  geom_hline(yintercept=mean(sub$WBC, na.rm = T), linetype="dashed", color = "#99000d")+
+  facet_zoom(ylim = c(0, 125))
+
+ggsave(filename = "~/Desktop/MetaAML_results/Figure_2/Supplimental/WBC_vs_gene.png", dpi = 300, width = 10, height = 5, units = "in") 
+
+# LDH
+ggplot(sub, aes(x=reorder(Gene, -LDH, median, na.rm = T), y=LDH)) +
+  geom_boxplot(fill="#238443", color="black") +
+  theme_cowplot(font_size = 15) +
+  theme(axis.text.x = element_text(angle = 45, vjust = .75, 
+                                   size = 10, hjust = .5)) +
+  xlab(label = NULL) +
+  ylab("LDH") +
+  geom_hline(yintercept=mean(sub$LDH, na.rm = T), linetype="dashed", color = "#99000d")+
+  facet_zoom(ylim = c(0, 1500))
+
+ggsave(filename = "~/Desktop/MetaAML_results/Figure_2/Supplimental/LDH_vs_gene.png", dpi = 300, width = 10, height = 5, units = "in") 
+
+# BM_blast_percent
+ggplot(sub, aes(x=reorder(Gene, -BM_blast_percent, median, na.rm = T), y=BM_blast_percent)) +
+  geom_boxplot(fill="#e6ab02", color="black") +
+  theme_cowplot(font_size = 15) +
+  theme(axis.text.x = element_text(angle = 45, vjust = .75, 
+                                   size = 10, hjust = .5)) +
+  xlab(label = NULL) +
+  ylab("BM Blast %") +
+  geom_hline(yintercept=mean(sub$BM_blast_percent, na.rm = T), linetype="dashed", color = "#99000d") 
+
+ggsave(filename = "~/Desktop/MetaAML_results/Figure_2/Supplimental/BM_blast_percent_vs_gene.png", dpi = 300, width = 10, height = 5, units = "in") 
+
+# PB_blast_percent
+ggplot(sub, aes(x=reorder(Gene, -PB_blast_percent, median, na.rm = T), y=PB_blast_percent)) +
+  geom_boxplot(fill="#8dd3c7", color="black") +
+  theme_cowplot(font_size = 15) +
+  theme(axis.text.x = element_text(angle = 45, vjust = .75, 
+                                   size = 10, hjust = .5)) +
+  xlab(label = NULL) +
+  ylab("PB Blast %") +
+  geom_hline(yintercept=mean(sub$PB_blast_percent, na.rm = T), linetype="dashed", color = "#99000d")
+
+ggsave(filename = "~/Desktop/MetaAML_results/Figure_2/Supplimental/PB_blast_percent_vs_gene.png", dpi = 300, width = 10, height = 5, units = "in") 
+
+
+
+
+# pairwise genotype correlations with clinical features ####
+gene_pairs=as.data.frame(t(combn(as.vector(unique(sub$Gene)),2)))
+
+sub2 = select(sub, Sample, Gene, PatientId, Age, Platelet, Hemoglobin, WBC, LDH, BM_blast_percent, PB_blast_percent)
+
+gene_pairs_list = list()
+z = 1
+
+for(i in 1:length(variables)){
+  print(i)
+  var = as.character(variables[i])
+  print(var)
+  sub3 = sub2
+  
+  names(sub3)[names(sub3) == variables[i]] <- "Variable"
+  
+  for(j in 1:nrow(gene_pairs)){
+    # print(j)
+    gene_1 = subset(sub3, sub3$Gene == as.character(gene_pairs[j,1]))
+    gene_2 = subset(sub3, sub3$Gene == as.character(gene_pairs[j,2]))
+    
+    overlap = inner_join(gene_1, gene_2, by = "Sample")
+    overlap = overlap$Sample
+    
+    temp = sub3
+    
+    temp$genotype = ifelse(temp$Sample %in% overlap, "Double", "Other")
+    
+    temp = unique(select(temp, Sample, Variable, genotype))
+    
+    n = as.numeric(length(unique(temp$Sample)))
+    
+    n_check = as.numeric(length(which(temp$genotype == "Double")))
+    
+    if(n_check >= 5){
+      print(j)
+      # calculate a p-value and effect size for the difference in clinical feaures based on genotype differences
+      p_val =  wilcox.test(as.numeric(temp$Variable) ~ temp$genotype, alternative = "two.sided")$p.value
+      
+      effect_size = cohens_d(as.numeric(Variable) ~ genotype, data = temp)
+      n_n1 = as.numeric(length(which(temp$genotype == "Double")))
+      n_n2 = as.numeric(length(which(temp$genotype == "Other")))
+      effect_size_ci = cohen.d.ci(d = effect_size, n = n, n1 = n_n1, n2 = n_n2)
+      
+      
+      variable_stats <- data.frame(matrix(NA, nrow = 1, ncol = 8))
+      names(variable_stats) <- c("Variable", "Gene_1", "Gene_2", "effect_size", "CI_lower", "CI_upper", "p_value", "n_double")
+      
+      variable_stats[1,1] <- paste(var)
+      variable_stats[1,2] <- as.character(gene_pairs[j,1])
+      variable_stats[1,3] <- as.character(gene_pairs[j,2])
+      variable_stats[1,4] <- effect_size
+      variable_stats[1,5] <- effect_size_ci[1]
+      variable_stats[1,6] <- effect_size_ci[3]
+      variable_stats[1,7] <- p_val
+      variable_stats[1,8] <- n_check
+      
+      # Add each list in the loop to a list of lists
+      gene_pairs_list[[z]] = variable_stats 
+      
+      z = z + 1
+    } 
+  }
+}
+
+gene_pairs_list_final = do.call(rbind, gene_pairs_list)
+
+# correct for multiple hupotheses by variable
+var1_adj = list()
+
+z = 1
+
+for(i in 1:length(variables)){
+  print(i)
+  variable = as.character(variables[i])
+  
+  var1 = subset(gene_pairs_list_final, gene_pairs_list_final$Variable == variable)
+  
+  var1$q_val = p.adjust(var1$p_value)
+  
+  var1_adj[[z]] = var1 
+  
+  z = z + 1
+  
+}
+gene_pairs_list_final_adj <- do.call(rbind, var1_adj)
+
+# annotating color for the significant points
+gene_pairs_list_final_adj$sig_color = "not_sig_ES"
+
+for(i in 1:nrow(gene_pairs_list_final_adj)){
+  if(gene_pairs_list_final_adj$q_val[i] <= 0.05 & gene_pairs_list_final_adj$effect_size[i] > 0){
+    gene_pairs_list_final_adj$sig_color[i] = "sig_pos_ES"
+  }
+  if(gene_pairs_list_final_adj$q_val[i] <= 0.05 & gene_pairs_list_final_adj$effect_size[i] < 0){
+    gene_pairs_list_final_adj$sig_color[i] = "sig_neg_ES"
+  }
+}
+
+
+gene_pairs_list_final_adj$point_label = paste(gene_pairs_list_final_adj$Gene_1, " + ", gene_pairs_list_final_adj$Gene_2, sep = "")
+
+for(i in 1:nrow(gene_pairs_list_final_adj)){
+  if(gene_pairs_list_final_adj$q_val[i] > 0.05){
+    gene_pairs_list_final_adj$point_label[i] = ""
+  }
+}
+
+gene_pairs_list_final_adj$sig_color = as.factor(gene_pairs_list_final_adj$sig_color)
+
+max_p = max(-log10(gene_pairs_list_final_adj$p_value))
+
+gene_pairs_list_final_adj$Variable = factor(gene_pairs_list_final_adj$Variable, levels=c('WBC','Hemoglobin','Platelet','LDH', 'BM_blast_percent', 'PB_blast_percent', 'Age'))
+
+# plot results per variable
+p = ggplot(gene_pairs_list_final_adj, aes(x=gene_pairs_list_final_adj$effect_size, y=-log10(gene_pairs_list_final_adj$p_value), color = sig_color, size = n_double)) +
+  # geom_label_repel(aes(label=point_label),box.padding = .5, hjust=0, vjust=1.5, size = 2.5) +
+  geom_hline(yintercept = 3.563053,  linetype = "dashed", color = "lightgrey") +
+  geom_point(alpha = 0.75) +
+  geom_point(shape = 21, color = "black", alpha = 0.25)  +
+  scale_size_area(max_size = 10,breaks=c(10,25,50,100,250,350)) +
+  geom_label_repel(aes(label=point_label),box.padding = .5, hjust=1, vjust=1.5, size = 2.5) +
+  # geom_hline(yintercept = 3.563053,  linetype = "dashed", color = "lightgrey") +
+  theme_cowplot() +
+  scale_colour_manual(values = c("sig_pos_ES"="#b35806", "sig_neg_ES" = "#542788", "not_sig_ES"="lightgrey")) +
+  theme(legend.position="right") +
+  # geom_hline(yintercept = 1.30103,  linetype = "dashed", color = "darkgrey") +
+  ylab(label= "-log10(p-value)") +
+  xlab(label= "Effect Size (co-mut vs. others)") +
+  # scale_y_continuous(expand = c(0, 0)) +
+  theme(plot.title = element_text(color="black", size=20)) 
+
+g = guide_legend(override.aes=list(colour="lightgrey"), "n. co-mut")
+
+p + facet_wrap(. ~ Variable, ncol = 7) + guides(size = g, color = FALSE) +
+  theme(
+    # legend.title = element_blank(), 
+    strip.background = element_rect(colour="black", fill="white", 
+                                    size=1.5, linetype="solid")) 
+
+ggsave(filename = "~/Desktop/MetaAML_results/Figure_2/Pairwise_genotype_clinical_correlations.png", dpi = 300, width = 15, height = 5, units = "in")
+
+
+
+#### statistical analysis of mutation co-occurence ####
 # subset analysis to the de novo cohort
 final_data_matrix_2_sub <- subset(final_data_matrix, Subset == "de_novo")
 
@@ -305,14 +595,15 @@ for(i in 1:nrow(df)){
   }
 }
 
-ggplot(df, aes(x=log(df$odds_ratio), y=-log(df$fishers_exact), color = factor(significant))) +
+ggplot(df, aes(x=log(df$odds_ratio), y=-log10(df$fishers_q), color = factor(significant), size = )) +
   geom_point(alpha = .75) +
+  theme_cowplot() +
   geom_label_repel(aes(label=labels),hjust=0, vjust=1.5, size = 2) +
   scale_colour_manual(values = c("Co-occuring"= "#b2182b", "Mutually exclusive"="#2166ac", "NS"="lightgrey")) + 
   theme(legend.position="none") +
-  ylab(label= "-log(Fisher's Exact p-value)") +
+  ylab(label= "-log10(q-value)") +
   xlab(label= "log(Odds Ratio)") +
-  labs(title = NULL)
+  labs(title = NULL) 
 
 ggsave(filename = "~/Desktop/MetaAML_results/Figure_2/volcano_plot_co_occurence.pdf", dpi = 300, width = 3.5, height =  5, units = "in")
 
@@ -420,71 +711,19 @@ for(i in 1:nrow(genes)){
   if(nstrata > 3 & n_pts_both >= 10){
     
     # perform analysis between the different groups to get individual and pairwise hazard ratios
-    # dat_1 = subset(temp_sub_final, STRATA == 0 | STRATA == 1 | STRATA == 6)
-    # dat_1$STRATA[dat_1$STRATA==6] = 1
-    # 
-    # dat_2 = subset(temp_sub_final, STRATA == 0 | STRATA == 2 | STRATA == 6)
-    # dat_2$STRATA[dat_2$STRATA==6] = 2
+    # co-mutated vs others
     
-    dat_3 = subset(temp_sub_final, STRATA == 1 | STRATA == 6)
-    dat_4 = subset(temp_sub_final, STRATA == 2 | STRATA == 6)
-    dat_5 = subset(temp_sub_final, STRATA == 0 | STRATA == 6)
+    dat_6 = temp_sub_final
     
-    # run the Cox models
-    # gene 1 vs wt
-    # model_1 <- coxph( Surv(Time_to_OS, Censor) ~ STRATA,
-    #                   data = dat_1)
-    # forest_1=cox_as_data_frame(coxphsummary = model_1, unmangle_dict = NULL,
-    #                            factor_id_sep = ":", sort_by = NULL)
-    # forest_1$genes = paste(gene1)
-    # forest_1$gene_tested = paste(gene1, "vs_wt", sep = "_")
-    # 
-    # # extract the log-rank p-value for the individual comparisons
-    # forest_1$log_rank_p = summary(model_1)$sctest[3]
-    # 
-    # # gene 2 vs wt
-    #       model_2 <- coxph( Surv(Time_to_OS, Censor) ~ STRATA,
-    #                         data = dat_2)
-    #       forest_2=cox_as_data_frame(coxphsummary = model_2, unmangle_dict = NULL,
-    #                                  factor_id_sep = ":", sort_by = NULL)
-    #       forest_2$genes = paste(gene2)
-    #       forest_2$gene_tested = paste(gene2, "vs_wt", sep = "_")
+    dat_6$STRATA_all = ifelse(dat_6$STRATA == 6, 6,0)
     
-    # extract the log-rank p-value for the individual comparisons
-    # forest_2$log_rank_p = summary(model_2)$sctest[3]
-    
-    # co-mutated vs gene 1
-    #              model_3 <- coxph( Surv(Time_to_OS, Censor) ~ STRATA,
-    #                                data = dat_3)
-    #              forest_3=cox_as_data_frame(coxphsummary = model_3, unmangle_dict = NULL,
-    #                                         factor_id_sep = ":", sort_by = NULL)
-    #              forest_3$gene_1 = gene1
-    #              forest_3$gene_2 = gene2
-    #              forest_3$gene_tested = paste(gene1, "vs_both", sep = "_")
-    #              
-    #              # extract the log-rank p-value for the individual comparisons
-    #              forest_3$log_rank_p = summary(model_3)$sctest[3]
-    #              
-    # # co-mutated vs gene 2
-    #                      model_4 <- coxph( Surv(Time_to_OS, Censor) ~ STRATA,
-    #                                        data = dat_4)
-    #                      forest_4=cox_as_data_frame(coxphsummary = model_4, unmangle_dict = NULL,
-    #                                                 factor_id_sep = ":", sort_by = NULL)
-    #                      forest_4$gene_1 = gene1
-    #                      forest_4$gene_2 = gene2
-    #                      forest_4$gene_tested = paste(gene2, "vs_both", sep = "_")
-    #                      
-    #                      # extract the log-rank p-value for the individual comparisons
-    #                      forest_4$log_rank_p = summary(model_4)$sctest[3]
-    
-    # co-mutated vs wt
-    model_5 <- coxph( Surv(Time_to_OS, Censor) ~ STRATA,
-                      data = dat_5)
+    model_5 <- coxph( Surv(Time_to_OS, Censor) ~ STRATA_all,
+                      data = dat_6)
     forest_5=cox_as_data_frame(coxphsummary = model_5, unmangle_dict = NULL,
                                factor_id_sep = ":", sort_by = NULL)
     forest_5$gene_1 = gene1
     forest_5$gene_2 = gene2
-    forest_5$gene_tested = paste(gene1, gene2, "vs_wt", sep = "_")
+    forest_5$gene_tested = paste(gene1, gene2, "vs_others", sep = "_")
     
     # extract the log-rank p-value for the individual comparisons
     forest_5$log_rank_p = summary(model_5)$sctest[3]
@@ -552,21 +791,21 @@ for(i in 1:nrow(genes)){
                              legend.labs = l_labs,
                              legend.title = "Mutation status",
                              legend = "none",
-                             ggtheme = theme(plot.title = element_text(hjust = 0.5)))
+                             ggtheme = theme_cowplot())
       
       plot_list[[i]] = surv_plot
       
-      print(surv_plot)
+      # print(surv_plot)
       # 
-      #   png(filename = paste("~/Desktop/MetaAML_results/Data/Figures/survival_by_co_occurence/",gene1, "_", gene2, "_co_occurence_survival.png", sep = ""), res = 300, width = 6, height = 4.5, units = "in")
+      #   png(filename = paste("~/Desktop/MetaAML_results/Data/Figures/mutation_co_occurence/survival_by_co_occurence/",gene1, "_", gene2, "_co_occurence_survival.png", sep = ""), res = 300, width = 6, height = 4.5, units = "in")
       # 
       #   surv_plot
       #   print(surv_plot)
       #   dev.off()
-      # }
+      }
     }
   }
-}
+
 
 # bind all data
 temp_final_hr = as.data.frame(do.call(rbind, results_list))
@@ -883,19 +1122,19 @@ ggsave(filename = "~/Desktop/MetaAML_results/Figure_2/Supplimental/forrest_plot_
 
 # volcano plot ####
 
-df = as.data.frame(hazard_ratio)
+df = as.data.frame(temp_final_hr)
 
 # remove duplicate rows
-df = df %>% distinct(df$q_value_HR, .keep_all = TRUE)
+df = df %>% distinct(df$q_value, .keep_all = TRUE)
 
 df$significant = "NS"
 
 # annotate significance
 for(i in 1:nrow(df)){
-  if(df$q_value_HR[i] < 0.05 & df$HR[i] < 1){
+  if(df$q_value[i] < 0.05 & df$HR[i] < 1){
     df$significant[i] = "Favorable"
   }
-  if(df$q_value_HR[i] < 0.05 & df$HR[i] > 1){
+  if(df$q_value[i] < 0.05 & df$HR[i] > 1){
     df$significant[i] = "Unfavorable"
   }
 }
@@ -904,23 +1143,28 @@ for(i in 1:nrow(df)){
 df$labels = NA
 
 for(i in 1:nrow(df)){
-  if(-log(df$q_value_HR[i]) > 8){
+  if(df$q_value[i] < 0.05){
     df$labels[i] = paste(df$gene_1[i], " + ", df$gene_2[i])
   }
 }
 
 # tp53 is a huge outlier so for the plot remove it and then later add it ot the upper right corner
-df = df[!(df$gene_1=="TP53" & df$gene_2=="TP53"),]
+# df = df[!(df$gene_1=="TP53" & df$gene_2=="TP53"),]
 
-ggplot(df, aes(x=df$HR, y=-log(df$q_value_HR), color = factor(significant))) +
+p = ggplot(df, aes(x=df$HR, y=-log10(df$q_value), color = factor(significant), size = num_pts)) +
   geom_point(alpha = .75) +
   geom_label_repel(aes(label=labels),hjust=0, vjust=1.5, size = 2) +
   scale_colour_manual(values = c("Favorable"= "#1b7837", "Unfavorable" = "#762a83", "NS"="#737373")) + 
-  theme(legend.position="none") +
-  ylab(label= "-log(HR q-value)") +
+  theme_cowplot() +
+   theme(legend.position="nont") +
+  ylab(label= "-log10(q-value)") +
   xlab(label= "Hazard Ratio") +
   labs(title = NULL) +
   theme(plot.title = element_text(color="black", size=20))
+
+g = guide_legend(override.aes=list(colour="lightgrey"), "n. co-mut")
+
+p  + guides(size = g, color = FALSE) 
 
 ggsave(filename = "~/Desktop/MetaAML_results/Figure_2/volcano_plot_co_occurence_survival.pdf", dpi = 300, width = 3.5, height =  5, units = "in")
 
@@ -942,11 +1186,11 @@ hr_odds = inner_join(odds_ratio, hazard_ratio, by = c("gene_1", "gene_2"))
 hr_odds$color = "NS"
 
 for(i in 1:nrow(hr_odds)){
-  if(hr_odds$q_value_HR[i] < 0.1 & hr_odds$HR[i] > 1){
-    hr_odds$color[i] = "HR > 1 & q < 0.1"
+  if(hr_odds$q_value_HR[i] < 0.05 & hr_odds$HR[i] > 1){
+    hr_odds$color[i] = "HR > 1\nq < 0.05\n"
   }
-  if(hr_odds$q_value_HR[i] < 0.1 & hr_odds$HR[i] < 1){
-    hr_odds$color[i] = "HR < 1 & q < 0.1"
+  if(hr_odds$q_value_HR[i] < 0.05 & hr_odds$HR[i] < 1){
+    hr_odds$color[i] = "HR < 1\nq < 0.05\n"
   }
 }
 
@@ -954,28 +1198,30 @@ for(i in 1:nrow(hr_odds)){
 hr_odds$labels = NA
 
 for(i in 1:nrow(hr_odds)){
-  if(hr_odds$q_value_HR[i] < 0.1){
+  if(hr_odds$q_value_HR[i] < 0.05){
     if(log(hr_odds$HR[i]) > 0.18 | log(hr_odds$HR[i]) < -0.2 | log(hr_odds$odds_ratio[i]) < -1 | log(hr_odds$odds_ratio[i]) > 1){
       hr_odds$labels[i] = paste(hr_odds$gene_1[i], "+",  hr_odds$gene_2[i])
     } 
   }
 }
 
-ggplot(hr_odds, aes(x = log(odds_ratio), y = log(HR))) +
+ggplot(hr_odds, aes(x = log(odds_ratio), y = log(HR), color = as.factor(color))) +
   geom_point(aes(color = color, shape = ), size = 3, alpha = 0.75) +
   xlab("log(Odds Ratio)") +
   ylab("log(Hazard Ratio)") +
-  geom_label_repel(aes(label=labels),
-                   size = 1.5) +
   scale_color_manual(values = c("#1b7837",  "#762a83", "grey")) +
   geom_point(shape = 1, size =  3,colour = "black") +
   geom_hline(yintercept=log(1), linetype="dashed", color = "grey") +
   geom_vline(xintercept=log(1), linetype="dashed", color = "grey") +
+  geom_label_repel(aes(label=labels),
+                   size = 2.5) +
+  theme_cowplot() +
   theme(
-    legend.title = element_blank()) 
+    legend.position = "none")
+  
 
 
-ggsave(filename = "~/Desktop/MetaAML_results/Figure_2/correlation_of_odds_ratio_and_HR_de_novo.pdf", dpi = 300, width = 6, height = 5, units = "in")
+ggsave(filename = "~/Desktop/MetaAML_results/Figure_2/correlation_of_odds_ratio_and_HR_de_novo.pdf", dpi = 300, width = 5, height = 5, units = "in")
 
 write.csv(hr_odds, "~/Desktop/MetaAML_results/Data/Tables/correlation_of_odds_ratio_and_HR_de_novo.pdf.csv")
 

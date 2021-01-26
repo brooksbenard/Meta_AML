@@ -31,7 +31,7 @@ dir.create("~/Desktop/MetaAML_results/raw_data")
 setwd("~/Desktop/MetaAML_results/raw_data")
 
 # ============================================================================================================= #
-# Using the different datasets, create a single matrix containing all patients, variables, and values possible. 
+# Using the different datasets, create a single matrix containing all patients, variables, and values possible.
 # ============================================================================================================= #
 
 # ========= #
@@ -64,7 +64,7 @@ variants <- setDT(variants)[gene_name %chin% TCGA_variants$Hugo_Symbol]
 variants_2 <- variants %>%
   select("gene_name")
 
-# count the number of mutations per gene 
+# count the number of mutations per gene
 mut_table <- aggregate(data.frame(count = variants_2), list(value = variants_2$gene_name), length)
 mut_table <- select(mut_table, "value", "gene_name")
 mut_table = mut_table[-1,]
@@ -92,7 +92,7 @@ mut_table_final_TCGA$Cohort <- "TCGA"
 # Beat AML (Tyner et al.)
 # cohort and clinical data
 download.file("https://static-content.springer.com/esm/art%3A10.1038%2Fs41586-018-0623-z/MediaObjects/41586_2018_623_MOESM3_ESM.xlsx", destfile = "~/Desktop/MetaAML_results/raw_data/41586_2018_623_MOESM3_ESM.xlsx")
-# 
+#
 # mutation data
 download.file("https://api.gdc.cancer.gov/data/0d8851d7-1af0-4054-a527-5db763138400", destfile = "~/Desktop/MetaAML_results/raw_data/supplementalTable06.tsv")
 
@@ -142,15 +142,15 @@ BeatAML_variants_sub <- BeatAML_variants %>%
 colnames(BeatAML_variants_sub)[4:5] <- c("variant_type", "amino_acid_change")
 
 # remove duplicate calls
-BeatAML_variants_sub <- BeatAML_variants_sub %>% 
+BeatAML_variants_sub <- BeatAML_variants_sub %>%
   distinct(labId, symbol, t_vaf, .keep_all = T)
 
 # filter to variants present in the patient group and ensure no duplicate pts are represented
-BeatAML_variants_sub <- setDT(BeatAML_variants_sub)[labId %chin% pt_subset_2$labId] 
+BeatAML_variants_sub <- setDT(BeatAML_variants_sub)[labId %chin% pt_subset_2$labId]
 BeatAML_variants_sub <- unique(BeatAML_variants_sub)
 colnames(BeatAML_variants_sub)[3] <- "VAF"
 combined <- BeatAML_variants_sub
-combined$VAF <- as.numeric(combined$VAF) 
+combined$VAF <- as.numeric(combined$VAF)
 
 colnames(combined)[4] <- c("variant_type")
 
@@ -205,7 +205,7 @@ files_list <- as.data.frame(list.files(path="~/Desktop/MetaAML_results/raw_data/
 
 colnames(files_list)[1] <- "file_path"
 
-# create empty list to populate results into 
+# create empty list to populate results into
 results_list <- list()
 z <- 1
 
@@ -214,49 +214,49 @@ for(i in 1:nrow(files_list)){
   # define the path to the individual file for each itteration
   file_name <- as.character(files_list$file_path[i])
   results <- read.table(paste("~/Desktop/MetaAML_results/raw_data/Archive/",file_name, sep = ""), header=F, fill = T, sep = "\t") # load file
-  
+
   # strip the patient ID from the file hame
   pt_id <- gsub("\\_.*","", file_name) %>%
     as.character(basename(file_name))
-  
+
   # use the unique nature of these results files to strip VAFS using the % symbol amd INDEL frequencies using the "." symbol
   vaf_hits <- results[grep("%", results$V10), ]
   indel_hits <- results[grepl("\\.", results$V12), ]
-  
+
   n_hits_vaf <- as.numeric(nrow(vaf_hits))
-  
+
   # create new data frame to populate VAF results
   temp_dat1 <- data.frame(matrix(NA, nrow = n_hits_vaf, ncol = 5))
   names(temp_dat1) <- c("Sample", "Mutation", "VAF", "SNV_or_Indel", "amino_acid_change")
-  
+
   temp_dat1[,1] <- pt_id
   temp_dat1[,2] <- vaf_hits$V8
   temp_dat1[,3] <- vaf_hits$V10
   temp_dat1[,4] <- "SNV"
   temp_dat1[,5] <- vaf_hits$V9
-  
+
   # create new data frame to populate INDEL results
   n_hits_indel <- as.numeric(nrow(indel_hits))
-  
+
   if(n_hits_indel > 0){
     temp_dat2 <- data.frame(matrix(NA, nrow = n_hits_indel, ncol = 5))
     names(temp_dat2) <- c("Sample", "Mutation", "VAF", "SNV_or_Indel", "amino_acid_change")
-    
+
     temp_dat2[,1] <- pt_id
     temp_dat2[,2] <- indel_hits$V4
     temp_dat2[,3] <- indel_hits$V12
     temp_dat2[,4] <- "INDEL"
     temp_dat2[,5] <- indel_hits$V5
-    
+
     # bind the datasets together
     temp_dat_final <- rbind(temp_dat1, temp_dat2)
-    
+
     results_list[[z]] <- temp_dat_final
-    z <- z + 1 
+    z <- z + 1
   } else {
     results_list[[z]] <- temp_dat1
-    
-    z <- z + 1 
+
+    z <- z + 1
   }
 }
 
@@ -307,7 +307,7 @@ for(i in 1:nrow(flt3_itd)){
   pt = pt[1,]
   pt$variant_type = "ITD"
   flt3_list[[z]] <- pt
-  z <- z + 1 
+  z <- z + 1
 }
 final_flt3_list = as.data.frame(do.call(rbind, flt3_list))
 
@@ -318,11 +318,11 @@ for(i in 1:nrow(temp_final_flt3)){
   if(!is.na(temp_final_flt3$variant_type[i])){
     if(temp_final_flt3$variant_type[i] == "ITD"){
       temp_final_flt3$SNV_or_Indel[i] <- "ITD"
-    } 
+    }
   }
 }
 
-# # remove unnecessary column  
+# # remove unnecessary column
 temp_final_flt3$variant_type <- NULL
 
 colnames(temp_final_flt3)[1:5] <- c("labId", "symbol", "VAF", "variant_type", "amino_acid_change")
@@ -330,7 +330,7 @@ colnames(temp_final_flt3)[1:5] <- c("labId", "symbol", "VAF", "variant_type", "a
 # ========================================================================================================================================================= #
 # seems like there are rare mutations in the stanford samples that are not recurrent in the other studies. For now, filter to only mutations found in TCGA
 # ========================================================================================================================================================= #
-# temp_final_flt3 <- setDT(temp_final_flt3)[symbol %chin% variants$gene_name] 
+# temp_final_flt3 <- setDT(temp_final_flt3)[symbol %chin% variants$gene_name]
 
 # remove the % symbol and normalize the VAF calls
 temp_final_flt3$VAF <- sub("%$", "", temp_final_flt3$VAF)
@@ -407,7 +407,7 @@ colnames(joined_muts_clinical) <- c(names)
 
 # rename the varient type for homogeneity with the other data sets
 for(i in 1:nrow(joined_muts_clinical)){
-  
+
   if(joined_muts_clinical$VARIANT_TYPE[i] == "D" & joined_muts_clinical$GENE[i] == "FLT3"){
     joined_muts_clinical$VARIANT_TYPE[i] <- "Deletion"
   }
@@ -509,10 +509,10 @@ Stanford_survival2 <- select(Stanford_survival, `Patient SU Number`, `Overall Su
 names(Stanford_survival2)[1] = "Sample"
 
 clin_annotations <- read_excel("~/Desktop/MetaAML_results/raw_data/Archive/160104_RM_AML_Sample_Info.xlsx")
-# # 
+# #
 # # # select columns of interest
 labels <- select(clin_annotations, Sample, `% Blasts`)
-# 
+#
 Stanford_survival2 = left_join(Stanford_survival2, labels, by = "Sample")
 
 
@@ -912,7 +912,7 @@ final_data_matrix <- rbind.fill(final_data_matrix, huet)
 # Hirsch et al 2016 Nat Com ####
 # downloaded supplimental data pdf files were downloaded, converted to excel files, and manually formatted
 download.file("https://static-content.springer.com/esm/art%3A10.1038%2Fncomms12475/MediaObjects/41467_2016_BFncomms12475_MOESM1148_ESM.xlsx", destfile = "~/Desktop/MetaAML_results/raw_data/41467_2016_BFncomms12475_MOESM1148_ESM.xlsx")
-# 
+#
 download.file("https://static-content.springer.com/esm/art%3A10.1038%2Fncomms12475/MediaObjects/41467_2016_BFncomms12475_MOESM1148_ESM.xlsx", destfile = "~/Desktop/MetaAML_results/raw_data/41467_2016_BFncomms12475_MOESM1149_ESM.xlsx")
 
 hirsch_clinical=read_excel("~/Desktop/MetaAML_results/raw_data/Hirsch_2016_Nat_Comm_clinical_data.xlsx", sheet = 1)
@@ -1052,13 +1052,13 @@ final_data_matrix <- rbind.fill(final_data_matrix, azizi_data)
 # thought this was unique samples but it turns out this is just a subset of the Beat AML dataset already incorporated
 # download.file("https://static-content.springer.com/esm/art%3A10.1038%2Fs41467-018-08263-x/MediaObjects/41467_2018_8263_MOESM5_ESM.xlsx", destfile = "~/Desktop/MetaAML_results/raw_data/41467_2018_8263_MOESM5_ESM.xlsx")
 # download.file("https://static-content.springer.com/esm/art%3A10.1038%2Fs41467-018-08263-x/MediaObjects/41467_2018_8263_MOESM6_ESM.xlsx", destfile = "~/Desktop/MetaAML_results/raw_data/41467_2018_8263_MOESM6_ESM.xlsx")
-# # 
+# #
 # zhang_1 = read_excel("~/Desktop/MetaAML_results/raw_data/41467_2018_8263_MOESM5_ESM.xlsx", )
 # zhang_2 = read_excel("~/Desktop/MetaAML_results/raw_data/41467_2018_8263_MOESM6_ESM.xlsx")
-# 
+#
 # colnames(zhang_1) = zhang_1[1,]
 # zhang_1 = zhang_1[-1,]
-# 
+#
 # colnames(zhang_2) = zhang_2[1,]
 # zhang_2 = zhang_2[-1,]
 
@@ -1076,13 +1076,13 @@ for(i in 1:nrow(final_data_matrix)){
     }
     if(final_data_matrix$Subset[i] == "transformed" | final_data_matrix$Subset[i] == "sAML"){
       final_data_matrix$Subset[i] <- "secondary"
-    } 
+    }
     if(final_data_matrix$Subset[i] == "AML" | final_data_matrix$Subset[i] == "de novo"){
       final_data_matrix$Subset[i] <- "de_novo"
-    } 
+    }
     if(final_data_matrix$Subset[i] == "Relapsed_AML"){
       final_data_matrix$Subset[i] <- "relapse"
-    } 
+    }
   }
 }
 
@@ -1250,7 +1250,7 @@ for(i in 1:nrow(final_data_matrix)){
   }
 }
 
-# complex karyotype 
+# complex karyotype
 for(i in 1:nrow(final_data_matrix)){
   if(final_data_matrix$Cohort[i] == "Papaemmanuil" & final_data_matrix$Cytogenetics[i] == 1){
     final_data_matrix$Cytogenetics[i] = "Complex Cytogenetics"
@@ -1301,7 +1301,7 @@ for(i in 1:nrow(final_data_matrix)){
   }
 }
 
-# select final columns and save the data frame 
+# select final columns and save the data frame
 
 final_data_matrix =  final_data_matrix %>%
   select(Sample,Gene,VAF,variant_type,amino_acid_change,Subset,PatientId,specimenType,Cohort,Censor,Time_to_OS,Sex,Age,Cytogenetics,Risk,BM_blast_percent,PB_blast_percent,WBC,Hemoglobin,LDH,Platelet,PB_wbc_percent,mut_freq_gene,mut_freq_pt,mut_freq_bin,VAF_male_x,mutation_category)
