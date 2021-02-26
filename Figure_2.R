@@ -9,9 +9,9 @@
 # Load libraries #
 # ============== #
 if (!require('ggplot2')) install.packages('ggplot2'); library('ggplot2')
-if (!require('tydyr')) install.packages('tydyr'); library('tydyr')
-if (!require('dplyr')) install.packages('dplyr'); library('dplyr')
-if (!require('cometExactTest')) install.packages('cometExactTest'); library('cometExactTest')
+if (!require('tydyr')) install.packages('tydyr', dependencies = TRUE); library('tydyr')
+if (!require('dplyr')) install.packages('dplyr', dependencies = TRUE); library('dplyr')
+if (!require('cometExactTest')) install.packages('cometExactTest', dependencies = TRUE); library('cometExactTest')
 if (!require('discover')) install.packages('discover'); library('discover')
 if (!require('stringr')) install.packages('stringr'); library('stringr')
 if (!require('maditr')) install.packages('maditr'); library('maditr')
@@ -21,6 +21,28 @@ if (!require('epitools')) install.packages('epitools'); library('epitools')
 if (!require('corrplot')) install.packages('corrplot'); library('corrplot')
 if (!require('RColorBrewer')) install.packages('RColorBrewer'); library('RColorBrewer')
 if (!require('rlist')) install.packages('rlist'); library('rlist')
+#
+if (!require('readxl')) install.packages('readxl'); library('readxl')
+if (!require('cowplot')) install.packages('cowplot'); library('cowplot')
+if (!require('plyr')) install.packages('plyr'); library('plyr')
+if (!require('muhaz')) install.packages('muhaz'); library('muhaz')
+if (!require('data.table')) install.packages('data.table'); library('data.table')
+if (!require('ggpubr')) install.packages('ggpubr'); library('ggpubr')
+if (!require('muhaz')) install.packages('muhaz'); library('muhaz')
+if (!require('survival')) install.packages('survival'); library('survival')
+if (!require('survivalAnalysis')) install.packages('survivalAnalysis', dependencies = TRUE); library('survivalAnalysis')
+if (!require('survMisc')) install.packages('survMisc'); library('survMisc')
+if (!require('survminer')) install.packages('survminer'); library('survminer')
+if (!require('ggsci')) install.packages('ggsci'); library('ggsci')
+if (!require('vegan')) install.packages('vegan'); library('vegan')
+if (!require('ggrepel')) install.packages('ggrepel'); library('ggrepel')
+if (!require('ggforce')) install.packages('ggforce'); library('ggforce')
+if (!require('rstatix')) install.packages('rstatix'); library('rstatix')
+if (!require('effsize')) install.packages('effsize'); library('effsize')
+if (!require('psych')) install.packages('psych'); library('psych')
+
+library(corrplot)
+library(RColorBrewer)
 
 dir.create("~/Desktop/MetaAML_results/Figure_2")
 dir.create("~/Desktop/MetaAML_results/Figure_2/Supplimental")
@@ -178,7 +200,7 @@ ggsave(filename = "~/Desktop/MetaAML_results/Figure_2/Supplimental/PB_blast_perc
 # pairwise genotype correlations with clinical features ####
 gene_pairs=as.data.frame(t(combn(as.vector(unique(sub$Gene)),2)))
 
-sub2 = select(sub, Sample, Gene, PatientId, Age, Platelet, Hemoglobin, WBC, LDH, BM_blast_percent, PB_blast_percent)
+sub2 = dplyr::select(sub, Sample, Gene, PatientId, Age, Platelet, Hemoglobin, WBC, LDH, BM_blast_percent, PB_blast_percent)
 
 gene_pairs_list = list()
 z = 1
@@ -203,7 +225,7 @@ for(i in 1:length(variables)){
     
     temp$genotype = ifelse(temp$Sample %in% overlap, "Double", "Other")
     
-    temp = unique(select(temp, Sample, Variable, genotype))
+    temp = unique(dplyr::select(temp, Sample, Variable, genotype))
     
     n = as.numeric(length(unique(temp$Sample)))
     
@@ -214,7 +236,7 @@ for(i in 1:length(variables)){
       # calculate a p-value and effect size for the difference in clinical feaures based on genotype differences
       p_val =  wilcox.test(as.numeric(temp$Variable) ~ temp$genotype, alternative = "two.sided")$p.value
       
-      effect_size = cohens_d(as.numeric(Variable) ~ genotype, data = temp)
+      effect_size = cohens_d(Variable ~ genotype, data = temp)$effsize
       n_n1 = as.numeric(length(which(temp$genotype == "Double")))
       n_n2 = as.numeric(length(which(temp$genotype == "Other")))
       effect_size_ci = cohen.d.ci(d = effect_size, n = n, n1 = n_n1, n2 = n_n2)
@@ -366,12 +388,12 @@ temp_for_odds_ratio = final_data_matrix_2_sub
 final_data_matrix_2_sub <- as.data.frame(t(final_data_matrix_2_sub))
 
 # run the DISCOVER analysis
-events <- discover.matrix(final_data_matrix_2_sub)
-subset <- rowSums(final_data_matrix_2_sub) > 25
-result.mutex <- pairwise.discover.test(events[subset, ])
-result.mutex
-print(result.mutex, fdr.threshold=0.05)
-result.mutex = as.data.frame(result.mutex)
+# events <- discover.matrix(final_data_matrix_2_sub)
+# subset <- rowSums(final_data_matrix_2_sub) > 25
+# result.mutex <- pairwise.discover.test(events[subset, ])
+# result.mutex
+# print(result.mutex, fdr.threshold=0.05)
+# result.mutex = as.data.frame(result.mutex)
 
 # odds ratio and fisher's exact p-value for each interaction ####
 # find all pairwise interactions
@@ -412,13 +434,14 @@ for(i in 1:nrow(genes)){
   }
   
   # store the results in a dataframe
-  odds <- data.frame(matrix(NA, nrow = 1, ncol = 4))
-  names(odds) <- c("gene1", "gene2", "odds_ratio", "fishers_exact")
+  odds <- data.frame(matrix(NA, nrow = 1, ncol = 5))
+  names(odds) <- c("gene1", "gene2", "odds_ratio", "fishers_exact", "n_cooccur")
   
   odds[1,1] <- gene_1
   odds[1,2] <- gene_2
   odds[1,3] <- odds_ratio
   odds[1,4] <- fishers_p
+  odds[1,5] <- temp$Freq[4]
   
   results_list[[n]] <- odds
   n=n+1   
@@ -460,13 +483,14 @@ for(i in 1:nrow(genes)){
   
   
   # store the results in a dataframe
-  odds <- data.frame(matrix(NA, nrow = 1, ncol = 4))
-  names(odds) <- c("gene1", "gene2", "odds_ratio", "fishers_exact")
+  odds <- data.frame(matrix(NA, nrow = 1, ncol = 5))
+  names(odds) <- c("gene1", "gene2", "odds_ratio", "fishers_exact", "n_cooccur")
   
   odds[1,1] <- gene_1
   odds[1,2] <- gene_2
   odds[1,3] <- odds_ratio
   odds[1,4] <- fishers_p
+  odds[1,5] <- temp$Freq[4]
   
   results_list[[n]] <- odds
   n=n+1   
@@ -475,63 +499,6 @@ temp_final_2 = as.data.frame(do.call(rbind, results_list))
 
 temp_final = unique(rbind(temp_final_1, temp_final_2))
 # use temp_final later in visualizing the fishers exact results
-
-
-# combine the DISCOVER results with the odds ratio numbers
-DISCOVER_final = left_join(temp_final, result.mutex, by = c("gene1", "gene2"))
-
-temp_final_odds = select(DISCOVER_final, gene1, gene2, odds_ratio)
-temp_final_odds <- dcast(temp_final, gene1 ~ gene2, value.var="odds_ratio")
-temp_final_odds = as.data.frame(temp_final_odds)
-rownames(temp_final_odds) <- as.character(temp_final_odds$gene1)
-temp_final_odds$gene1 <- NULL
-
-# res1 <- cor.mtest(temp_final_odds, conf.level = .95)
-
-for(i in 1:nrow(temp_final_odds)){
-  for(j in 1:ncol(temp_final_odds)){
-    # if( !is.na(temp_final_odds[i,j]) & temp_final_odds[i,j] == 0){
-    #   temp_final_odds[i,j] = NA
-    # }
-    if(!is.na(temp_final_odds[i,j]) & temp_final_odds[i,j] != 0){
-      temp_final_odds[i,j] = log(temp_final_odds[i,j])
-    } 
-  }
-}
-
-temp_final_odds = as.matrix(temp_final_odds)
-temp_final_odds[is.na(temp_final_odds)] <- 0
-
-# need to make sure the q-values calculated from the DISCOVER method are the same for each pait
-result.mutex_2 = result.mutex[,c(2,1,3,4)]
-colnames(result.mutex_2)[1:2] = c("gene1", "gene2")
-DISCOVER_final_2 = left_join(DISCOVER_final, result.mutex_2, by = c("gene1", "gene2"))
-DISCOVER_final_2$q.value = dplyr::coalesce(DISCOVER_final_2$q.value.x, DISCOVER_final_2$q.value.y)
-
-# write out results file
-dir.create("~/Desktop/MetaAML_results/Figure_2/Supplimental")
-write.csv(DISCOVER_final_2, "~/Desktop/MetaAML_results/Figure_2/Supplimental/DISCOVER_results.csv", row.names=FALSE)
-
-
-
-temp_final_q = select(DISCOVER_final_2, gene1, gene2, q.value)
-temp_final_q <- reshape2::dcast(temp_final_q, gene1 ~ gene2, value.var="q.value")
-temp_final_q = as.data.frame(temp_final_q)
-rownames(temp_final_q) <- temp_final_q$gene1
-temp_final_q$gene1 <- NULL
-temp_final_q[is.na(temp_final_q)] <- 1
-temp_final_q = as.matrix(temp_final_q)
-
-pdf(file = "~/Desktop/MetaAML_results/Figure_2/Supplimental/MetaAML_mutation_correlation_de_novo.pdf", width = 7.5, height = 7.5)
-
-corrplot(temp_final_odds, is.corr = F, type="upper", order="hclust",tl.col="black", outline = F, addgrid.col = "lightgrey",
-         col = brewer.pal(n = 8, name = "RdBu"), diag=FALSE, p.mat = temp_final_q, insig = "label_sig",
-         sig.level = c(.001, .01, .1), pch.cex = .9, pch.col = "black", na.label = "square", na.label.col = "white")
-dev.off()
-
-
-
-
 
 # Fisher's exact test  ####
 # plot results from Fisher's Exact analysis
@@ -591,49 +558,28 @@ df$labels = NA
 
 for(i in 1:nrow(df)){
   if(-log(df$fishers_exact[i]) > 25){
-    df$labels[i] = paste(df$gene1[i], " + ", df$gene2[i])
+    df$labels[i] = paste0(df$gene1[i], " + ", df$gene2[i])
   }
 }
 
-ggplot(df, aes(x=log(df$odds_ratio), y=-log10(df$fishers_q), color = factor(significant), size = )) +
+p = ggplot(df, aes(x=log(odds_ratio), y=-log10(fishers_q), color = significant, size = n_cooccur)) +
   geom_point(alpha = .75) +
-  theme_cowplot() +
-  geom_label_repel(aes(label=labels),hjust=0, vjust=1.5, size = 2) +
+  geom_label_repel(aes(label=labels),hjust=0, vjust=0, size = 2) +
   scale_colour_manual(values = c("Co-occuring"= "#b2182b", "Mutually exclusive"="#2166ac", "NS"="lightgrey")) + 
-  theme(legend.position="none") +
+  theme(legend.position="right") +
   ylab(label= "-log10(q-value)") +
   xlab(label= "log(Odds Ratio)") +
-  labs(title = NULL) 
+  labs(title = NULL) +
+  theme_cowplot()
 
-ggsave(filename = "~/Desktop/MetaAML_results/Figure_2/volcano_plot_co_occurence.pdf", dpi = 300, width = 3.5, height =  5, units = "in")
+g = guide_legend(override.aes=list(colour="lightgrey"), "n. co-mut")
+
+p + guides(size = g, color = FALSE) 
+
+ ggsave(filename = "~/Desktop/MetaAML_results/Figure_2/volcano_plot_co_occurence.pdf", dpi = 300, width = 4, height =  5, units = "in")
 
 
 # co-occurence and survival ####
-# MetaAML_survival_by_co_occurence
-# Brooks Benard
-# bbenard@stanford.edu
-# 04.03.2020
-if (!require('ggplot2')) install.packages('ggplot2'); library('ggplot2')
-if (!require('readxl')) install.packages('readxl'); library('readxl')
-if (!require('cowplot')) install.packages('cowplot'); library('cowplot')
-if (!require('reshape2')) install.packages('reshape2'); library('reshape2')
-if (!require('plyr')) install.packages('plyr'); library('plyr')
-if (!require('dplyr')) install.packages('dplyr'); library('dplyr')
-if (!require('muhaz')) install.packages('muhaz'); library('muhaz')
-if (!require('data.table')) install.packages('data.table'); library('data.table')
-if (!require('ggpubr')) install.packages('ggpubr'); library('ggpubr')
-if (!require('muhaz')) install.packages('muhaz'); library('muhaz')
-if (!require('survival')) install.packages('survival'); library('survival')
-if (!require('survivalAnalysis')) install.packages('survivalAnalysis'); library('survivalAnalysis')
-if (!require('survMisc')) install.packages('survMisc'); library('survMisc')
-if (!require('survminer')) install.packages('survminer'); library('survminer')
-if (!require('ggsci')) install.packages('ggsci'); library('ggsci')
-if (!require('vegan')) install.packages('vegan'); library('vegan')
-if (!require('rlist')) install.packages('rlist'); library('rlist')
-if (!require('ggrepel')) install.packages('ggrepel'); library('ggrepel')
-
-library(corrplot)
-library(RColorBrewer)
 
 # load data and subset to desired cohort
 load("~/Desktop/MetaAML_results/final_data_matrix.RData")
@@ -719,21 +665,24 @@ for(i in 1:nrow(genes)){
     
     model_5 <- coxph( Surv(Time_to_OS, Censor) ~ STRATA_all,
                       data = dat_6)
-    forest_5=cox_as_data_frame(coxphsummary = model_5, unmangle_dict = NULL,
-                               factor_id_sep = ":", sort_by = NULL)
+    
+    # forest_5=cox_as_data_frame(coxphsummary = model_5, unmangle_dict = NULL,
+    #                            factor_id_sep = ":", sort_by = NULL)
+    # create new data frame to populate results
+    forest_5 <- data.frame(matrix(NA, nrow = 1, ncol = 6))
+    names(forest_5) <- c("gene_1", "gene_2", "gene_tested", "HR", "lower_95", "upper_95")
+
     forest_5$gene_1 = gene1
     forest_5$gene_2 = gene2
     forest_5$gene_tested = paste(gene1, gene2, "vs_others", sep = "_")
+    forest_5$HR = round(exp(coef(model_5)), 2)
+    forest_5$lower_95 = round(exp(confint(model_5)[1]), 2)
+    forest_5$upper_95 = round(exp(confint(model_5)[2]), 2)
     
     # extract the log-rank p-value for the individual comparisons
     forest_5$log_rank_p = summary(model_5)$sctest[3]
     
-    # populated the results into a dataframe and apend that dataframe 
-    # forest_plot_data = rbindlist(list(forest_3, forest_4, forest_5))
-    
-    # forest_plot_data$iteration = i
-    
-    # add the number oco-occuring cases
+    # add the number of co-occuring cases
     forest_5$num_pts = n_pts_both
     
     forest_plot_data = forest_5
@@ -741,9 +690,6 @@ for(i in 1:nrow(genes)){
     results_list[[n]] <- forest_plot_data
     n=n+1   
     
-    # if(forest_plot_data$log_rank_p[1] <= 0.05 | forest_plot_data$log_rank_p[4] <= 0.05){
-    
-    #___________________#
     # plot all pairwise cases where there is a significant difference from WT
     if(summary(model_5)$sctest[3] < 0.05){
       
@@ -813,7 +759,7 @@ temp_final_hr = as.data.frame(do.call(rbind, results_list))
 # correct for mulitple hypothesis testing
 temp_final_hr$q_value <- p.adjust(temp_final_hr$log_rank_p, method = "fdr")
 
-temp_final_hr[,1:3] = NULL
+# temp_final_hr[,1:3] = NULL
 temp_final_hr = temp_final_hr %>%
   select(gene_1, gene_2, gene_tested, everything())
 
@@ -857,8 +803,19 @@ for(i in genes_uniqe){
   
   model <- coxph( Surv(Time_to_OS, Censor) ~ STRATA,
                   data = temp_sub_final)
-  forest=cox_as_data_frame(coxphsummary = model, unmangle_dict = NULL,
-                           factor_id_sep = ":", sort_by = NULL)
+  # forest=cox_as_data_frame(coxphsummary = model, unmangle_dict = NULL,
+  #                          factor_id_sep = ":", sort_by = NULL)
+  
+  forest <- data.frame(matrix(NA, nrow = 1, ncol = 6))
+  names(forest) <- c("gene_1", "gene_2", "gene_tested", "HR", "lower_95", "upper_95")
+  
+  forest$gene_1 = i
+  forest$gene_2 = i
+  # forest$gene_tested = paste(gene1, gene2, "vs_others", sep = "_")
+  forest$HR = round(exp(coef(model)), 2)
+  forest$lower_95 = round(exp(confint(model)[1]), 2)
+  forest$upper_95 = round(exp(confint(model)[2]), 2)
+  
   forest$gene_1 = i
   forest$gene_2 = i
   forest$gene_tested = paste(i, "vs_WT", sep = "_")
@@ -919,7 +876,7 @@ for(i in genes_uniqe){
                          legend.labs = l_labs,
                          legend.title = "Mutation status",
                          legend = "none",
-                         ggtheme = theme(plot.title = element_text(hjust = 0.5)))
+                         ggtheme = theme_cowplot())
   
   plot_list[[i]] = surv_plot
   # print(surv_plot)
@@ -1084,7 +1041,8 @@ ggplot(temp_final_hr_2, aes(x = reorder(genes, -HR), y = HR, label = temp_final_
         axis.title.y=element_blank(),
         axis.line.y = element_blank(),
         axis.ticks.y = element_blank()) +
-  coord_flip() 
+  coord_flip() +
+  theme_cowplot()
 
 # red vs grey color for significance
 # temp_final_hr_2$color = ifelse(temp_final_hr_2$q_value <= 0.1, "q < 0.1", "q > 0.1")
@@ -1113,7 +1071,8 @@ ggplot(temp_final_hr_2, aes(x = reorder(genes, -HR), y = HR, label = temp_final_
         axis.title.y=element_blank(),
         axis.line.y = element_blank(),
         axis.ticks.y = element_blank()) +
-  coord_flip() 
+  coord_flip()  +
+  theme_cowplot()
 
 ggsave(filename = "~/Desktop/MetaAML_results/Figure_2/Supplimental/forrest_plot_de_novo.pdf", dpi = 300, width = 7.5, height = 7.5, units = "in")
 
@@ -1156,11 +1115,12 @@ p = ggplot(df, aes(x=df$HR, y=-log10(df$q_value), color = factor(significant), s
   geom_label_repel(aes(label=labels),hjust=0, vjust=1.5, size = 2) +
   scale_colour_manual(values = c("Favorable"= "#1b7837", "Unfavorable" = "#762a83", "NS"="#737373")) + 
   theme_cowplot() +
-   theme(legend.position="nont") +
+   theme(legend.position="none") +
   ylab(label= "-log10(q-value)") +
   xlab(label= "Hazard Ratio") +
   labs(title = NULL) +
-  theme(plot.title = element_text(color="black", size=20))
+  theme(plot.title = element_text(color="black", size=20)) +
+  theme_cowplot()
 
 g = guide_legend(override.aes=list(colour="lightgrey"), "n. co-mut")
 
@@ -1172,7 +1132,7 @@ ggsave(filename = "~/Desktop/MetaAML_results/Figure_2/volcano_plot_co_occurence_
 
 # scattterplot of HR and odds ratio ####
 # read in the results from MetaAML_co_occurence_mutual_exlclusive_analysis.R
-odds_ratio = read.csv("~/Desktop/MetaAML_results/Figure_2/oods_ratio_and_fishers_results.csv")
+odds_ratio = read.csv("~/Desktop/MetaAML_results/Data/Tables/oods_ratio_and_fishers_results.csv")
 odds_ratio = select(odds_ratio, gene1, gene2, odds_ratio, fishers_q)
 colnames(odds_ratio) = c("gene_1", "gene_2", "odds_ratio", "q_value_odds")
 
@@ -1206,6 +1166,7 @@ for(i in 1:nrow(hr_odds)){
 }
 
 ggplot(hr_odds, aes(x = log(odds_ratio), y = log(HR), color = as.factor(color))) +
+  geom_smooth(method = "lm", color = "black", alpha = .25) +
   geom_point(aes(color = color, shape = ), size = 3, alpha = 0.75) +
   xlab("log(Odds Ratio)") +
   ylab("log(Hazard Ratio)") +
@@ -1217,7 +1178,12 @@ ggplot(hr_odds, aes(x = log(odds_ratio), y = log(HR), color = as.factor(color)))
                    size = 2.5) +
   theme_cowplot() +
   theme(
-    legend.position = "none")
+    legend.position = "none") 
+# +
+#   theme(plot.title = element_text(hjust = 0.5)) +
+#   stat_cor(
+#     aes(label = paste(..rr.label.., ..p.label.., sep = "~`,`~"))
+#   )
   
 
 
