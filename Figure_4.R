@@ -30,7 +30,9 @@ dir.create("~/Desktop/MetaAML_results/Figure_4")
 dir.create("~/Desktop/MetaAML_results/Figure_4/Supplimental")
 
 # load the MetaAML results file 
-load("~/Desktop/MetaAML_results/final_data_matrix.RData")
+load("~/Desktop/MetaAML_results/final_data_matrix_2.RData")
+
+final_data_matrix = final_data_matrix_2
 
 # pairwise ordering ####
 # calculate the number of cases for co-occuring mutations
@@ -49,9 +51,89 @@ for(i in 1:nrow(sub)){
 }
 sub=subset(sub, sub$Gene != "FLT3")
 
-genes <- unique(sub$Gene)
+genes <- as.data.frame(unique(sub$Gene))
 
 # calculate frequency of gene 1 occuring before gene 2
+results_list <- list()
+n=1
+
+for(i in 1:nrow(genes)){
+  print(i)
+  # i<- 1
+  # select mutations of interest
+  gene_1 <- as.character(genes[i,])
+  i2=(i+1)
+  for(j in i2:nrow(genes)){
+    # print(j)
+    # j <- 2
+    gene_2 <- as.character(genes[j,])
+    
+    if(gene_1 != gene_2){
+      sub_gene_1 <- subset(sub, sub$Gene == gene_1)
+      sub_gene_2 <- subset(sub, sub$Gene == gene_2)
+      
+      # select patients with both mutations
+      gene_1_and_2 <- inner_join(sub_gene_1, sub_gene_2, by = "Sample")
+      
+      n_cases <- as.numeric(nrow(gene_1_and_2))
+      
+      # add point color columns for visualizing clonal/subclonal trends
+      gene_1_and_2$vaf_ratio <- as.numeric((gene_1_and_2$VAF_CN_corrected.x - gene_1_and_2$VAF_CN_corrected.y))
+      
+      # gene_1_and_2$vaf_ratio <- as.numeric(gene_1_and_2$vaf_ratio)
+      
+      gene_1_and_2 <- gene_1_and_2[complete.cases(gene_1_and_2$vaf_ratio), ] 
+      
+      if(nrow(gene_1_and_2) > 0){
+        # define point color
+        gene_1_and_2$Clonality <- NA
+        
+        for(k in 1:nrow(gene_1_and_2)){
+          if(gene_1_and_2$vaf_ratio[k] <= 5 & gene_1_and_2$vaf_ratio[k] >= -5){
+            gene_1_and_2$Clonality[k] <- 0
+          }
+          if(gene_1_and_2$vaf_ratio[k] > 5){
+            gene_1_and_2$Clonality[k] <- 1
+          }
+          if(gene_1_and_2$vaf_ratio[k] < -5){
+            gene_1_and_2$Clonality[k] <- 2
+          }
+        }
+        
+        gene_1_and_2$Clonality <- as.numeric(gene_1_and_2$Clonality)
+        
+        # fraction of cases where gene x occurs before gene y
+        n_1_before_2 <- as.numeric(length(which(gene_1_and_2$Clonality == 1)))
+        n_2_before_1 <- as.numeric(length(which(gene_1_and_2$Clonality == 2)))
+        
+        temp_dat <- data.frame(matrix(NA, nrow = 1, ncol = 4))
+        colnames(temp_dat) = c("Gene_1", "Gene_2", "number_1_before_2", "number_2_before_1")
+        
+        temp_dat[n,1] <- (gene_1) 
+        temp_dat[n,2] <- (gene_2)
+        temp_dat[n,3] <- (n_1_before_2) 
+        temp_dat[n,4] <- (n_2_before_1) 
+        
+        results_list[[n]] <- temp_dat
+        n=n+1     
+      }
+    }
+  }
+}
+temp_final = na.omit(as.data.frame(do.call(rbind, results_list)))
+
+temp = temp_final[,c(2,1,3,4)]
+names(temp) = c("Gene_1", "Gene_2", "number_2_before_1", "number_1_before_2")
+
+temp_final = rbind(temp_final, temp)
+
+
+temp_final$fraction_1_then_2 = ((temp_final$number_1_before_2)/((temp_final$number_1_before_2)+(temp_final$number_2_before_1))*100)
+
+
+# now find the number of co-occuring cases
+genes <- unique(sub$Gene)
+
 temp_dat_2 <- data.frame(matrix(NA, nrow = length(genes), ncol = length(genes)))
 
 rownames(temp_dat_2) <- genes
@@ -73,7 +155,7 @@ for(i in 1:nrow(temp_dat_2)){
       
       if(nrow(gene_1_and_2) > 0){
         # add point color columns for visualizing clonal/subclonal trends
-        gene_1_and_2$vaf_ratio <- (gene_1_and_2$VAF_male_x.x - gene_1_and_2$VAF_male_x.y)
+        gene_1_and_2$vaf_ratio <- (gene_1_and_2$VAF_CN_corrected.x - gene_1_and_2$VAF_CN_corrected.y)
         
         gene_1_and_2 <- gene_1_and_2[complete.cases(gene_1_and_2$Sample), ] 
         
@@ -116,10 +198,11 @@ colnames(temp_dat_2_final_melted_2) <- c("Gene_1", "Gene_2", "number_1_and_2")
 temp_dat_final_melted_2 <- rbind(temp_dat_2_final_melted_1, temp_dat_2_final_melted_2)
 
 #combine number and fraction of supporting cases
-temp_dat_final_melted <- left_join(temp_dat_final_melted, temp_dat_final_melted_2, by = c("Gene_1", "Gene_2"))
+temp_dat_final_melted <- left_join(temp_dat_final_melted_2, temp_final, by = c("Gene_1", "Gene_2"))
 
 temp_dat_2_final_melted <- temp_dat_final_melted[,c(2,1,3)]
 colnames(temp_dat_2_final_melted) <- c("Gene_1", "Gene_2", "number_1_and_2")
+
 temp_dat_final_melted <- left_join(temp_dat_final_melted, temp_dat_2_final_melted, by = c("Gene_1", "Gene_2"))
 
 # temp_dat_final_melted <- temp_dat_final_melted[order(temp_dat_final_melted$Gene_2),]
@@ -151,12 +234,13 @@ for(i in 1:nrow(temp_dat_final_melted)){
 temp_dat_final_melted$Gene_2 <- as.character(temp_dat_final_melted$Gene_2)
 
 a = ggplot(data = temp_dat_final_melted, aes(y=forcats::fct_rev(reorder(Gene_1,Gene_1)), x = Gene_2)) +
-  geom_point(aes(size = temp_dat_final_melted$number_1_and_2.x, color = fraction_1_then_2), shape = 15, stat = "identity") +
-  geom_point(aes(size = temp_dat_final_melted$number_1_and_2.x), shape = 0, color = "#374E55FF") +
+  geom_point(aes(size = temp_dat_final_melted$number_1_and_2, color = fraction_1_then_2), shape = 15, stat = "identity") +
+  geom_point(aes(size = temp_dat_final_melted$number_1_and_2), shape = 0, color = "#374E55FF") +
   scale_color_gradient2(high = "#003c30", low = "#543005", mid = "#f5f5f5",
-                        midpoint = 0.5,
+                        midpoint = 50,
                         name= "Fraction of \nunambiguous\ncases\n(Gene 1 > Gene2)") +
   scale_size(range = c(1,7), name= "Number of\nco-occurences", breaks = c(25, 50,100,200)) +
+  theme_cowplot() +
   guides(    color = guide_colorbar(order = 1),
              fill = guide_legend(order = 0)) +
   theme(axis.text.x = element_text(angle = 90, vjust = .5,
@@ -173,8 +257,6 @@ a = ggplot(data = temp_dat_final_melted, aes(y=forcats::fct_rev(reorder(Gene_1,G
 print(a)
 
 ggsave(filename = "~/Desktop/MetaAML_results/Figure_4/order_of_mutations_de_novo.pdf", width = 7.5, height = 6, units = "in")
-
-write.csv("~/Desktop/MetaAML_results/Data/Tables/global_pairwise_vaf_ordering.csv")
 
 # Bradley-Terry ####
 # calculate the mean fraction and confidence interval for each mutation in the pairwise presidence plot by the Bradly-Terry method
@@ -222,7 +304,7 @@ for(i in 1:nrow(genes)){
       n_cases <- as.numeric(nrow(gene_1_and_2))
       
       # add point color columns for visualizing clonal/subclonal trends
-      gene_1_and_2$vaf_ratio <- as.numeric((gene_1_and_2$VAF_male_x.x - gene_1_and_2$VAF_male_x.y))
+      gene_1_and_2$vaf_ratio <- as.numeric((gene_1_and_2$VAF_CN_corrected.x - gene_1_and_2$VAF_CN_corrected.y))
       
       gene_1_and_2$vaf_ratio <- as.numeric(gene_1_and_2$vaf_ratio)
       
@@ -334,7 +416,6 @@ print(b)
 
 ggsave(filename = "~/Desktop/MetaAML_results/Figure_4/bradley_terry_order_de_novo.pdf", width = 7.5, height = 6, units = "in")
 
-write.csv(BT_MetaAML_mutation_ordering, "~/Desktop/MetaAML_results/Data/Tables/bradley_terry_order_de_novo.pdf.csv")
 
 #define the ordering based on the global pairwise analysis
 sub <- subset(final_data_matrix_2, final_data_matrix_2$mut_freq_gene >= 75 & final_data_matrix_2$Gene != "MLL" & final_data_matrix_2$Subset == "de_novo" & final_data_matrix_2$mut_freq_pt > 1)
@@ -705,7 +786,7 @@ ggsave(filename = "~/Desktop/MetaAML_results/Figure_4/gene_order_hr_forest_plot_
 # mutation categories ####
 # because there are still too few cases on a pairwise basis to perform survival analysis, I will now look at pairwise occurence more broadly in terms of mutation categories
 # sine it appears that epigenetic mutations occur first and proliferation hits last, I will find all patients who have mutations in these two categories, determine the order of aquizition, and performe survival analysis between patients with different order of aquizition
-dir.create("~/Desktop/MetaAML_results/Figure_4/survival_by_muation_category_ordering/pngs")
+ddir("~/Desktop/MetaAML_results/Figure_4/survival_by_muation_category_ordering/pngs")
 
 load("~/Desktop/MetaAML_results/final_data_matrix.RData")
 final_data_matrix_sub <- subset(final_data_matrix, final_data_matrix$Subset == "de_novo")
@@ -896,11 +977,6 @@ for(j in 1:nrow(mut_cat)){
 temp_final_hr_categories_order = as.data.frame(do.call(rbind, results_list))
 temp_final_hr_categories_order$fdr = p.adjust(temp_final_hr_categories_order$p, method = "fdr")
 
-temp_final_hr_categories_order[,1:3] = NULL
-temp_final_hr_categories_order = temp_final_hr_categories_order %>%
-  select(category_1, category_2, everything())
-
-write.csv(temp_final_hr_categories_order, "~/Desktop/Majeti_Lab/Manuscripts/Meta_AML/Files/Results_tables/Tables/survival_by_muation_category_ordering.csv")
 
 # summary plot of all survival curves
 plot_list = list.clean(plot_list)
