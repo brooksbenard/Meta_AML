@@ -1,5 +1,5 @@
 # ========================================================================================================================================== #
-# Figure_2.R
+# Figure_6.R
 # Author : Brooks Benard, bbenard@stanford.edu
 # Date: 09/01/2020
 # Description: This script analyses if the VAF of a specific mutation correlates with sensitivity or resistance to different drugs in the Beat AML study
@@ -27,15 +27,15 @@ if (!require('patchwork')) install.packages('patchwork'); library('patchwork')
 if (!require('rlist')) install.packages('rlist'); library('rlist')
 if (!require('ggridges')) install.packages('ggridges'); library('ggridges')
 
+dir.create("~/Desktop/MetaAML_results/Figure_6")
+dir.create("~/Desktop/MetaAML_results/Figure_6/Supplimental")
+
 # download data from BeatAML website
 download.file("https://static-content.springer.com/esm/art%3A10.1038%2Fs41586-018-0623-z/MediaObjects/41586_2018_623_MOESM3_ESM.xlsx", destfile = "~/Desktop/Majeti_Lab/MetaAML_results/41586_2018_623_MOESM3_ESM.xlsx")
 
 # data ####
 # read in drug sensitivity data
 BeatAML_sample_data_types <- read_excel("~/Desktop/MetaAML_results/raw_data/41586_2018_623_MOESM3_ESM.xlsx", sheet = 5)
-
-# read in BeatAML variants for analysis data
-BeatAML_variants <- read_excel("~/Desktop/MetaAML_results/raw_data/41586_2018_623_MOESM3_ESM.xlsx", sheet = 7)
 
 # read in drug response data
 drug_data <- read_excel("~/Desktop/MetaAML_results/raw_data/41586_2018_623_MOESM3_ESM.xlsx", sheet = 10)
@@ -77,6 +77,7 @@ cohort_colors = list("De novo" = "#C16622FF",
                      "Other" = "#FFA319FF")
 
 ggplot(dat, aes(x = auc, y = as.factor(subset), fill = subset)) +
+  theme_cowplot() +
   geom_density_ridges(
     jittered_points = F, position = "raincloud",
     alpha = 1, scale = 1,
@@ -96,6 +97,7 @@ ggplot(dat, aes(x = auc, y = reorder(as.factor(inhibitor), auc))) +
   ) +
   geom_vline(xintercept=70, linetype="dashed", color = "black") +
   scale_y_discrete(expand = c(0,0)) +
+  theme_cowplot() +
   ylab(label = NULL) +
   theme(legend.position = "none",
         axis.text.y = element_text(size = 7.5)) +
@@ -105,36 +107,111 @@ ggsave(filename = "~/Desktop/MetaAML_results/Figure_6/Supplimental/beat_aml_auc_
 
 
 
-# vaf analysis ####
+# VAF correction ####
 
-## Analyse all mutation relationships to a drug by performing logistic regression between  VAF vs AUC 
+# read in BeatAML variants for analysis
+BeatAML_variants <- read_excel("~/Desktop/MetaAML_results/raw_data/41586_2018_623_MOESM3_ESM.xlsx", sheet = 7)
+
+# extract useful columns
+BeatAML_variants_sub <- BeatAML_variants %>%
+  dplyr::select("labId", "symbol", "chrom", "t_vaf", "variant_class", "short_aa_change")
+
+# remove duplicate calls
+BeatAML_variants_sub <- BeatAML_variants_sub %>%
+  distinct(labId, symbol, chrom, t_vaf, short_aa_change)
+
+colnames(BeatAML_variants_sub)[1] = "LabId"
+
+# read in cytogenetic data 
+BeatAML_cytogenetics = read_excel("~/Desktop/MetaAML_results/raw_data/41586_2018_623_MOESM3_ESM.xlsx", sheet = 5)
+
+# extract useful columns
+BeatAML_cytogenetics_sub <- BeatAML_cytogenetics %>%
+  dplyr::select("LabId", "consensus_sex", "Karyotype", "Other.Cytogenetics")
+
+BeatAML_aggrigate = left_join(BeatAML_variants_sub, BeatAML_cytogenetics_sub, by = "LabId")
+
+BeatAML_aggrigate = subset(BeatAML_aggrigate, BeatAML_aggrigate$symbol %in% mut_list)
+
+
+# download a file correlating the chromosome loci with gene ID
+# http://uswest.ensembl.org/biomart/martview/a3043f537a26692111e9a7a94003ff68
+all_genes <- read.table("~/Downloads/mart_export.txt", sep = "\t", header = T, fill = T,  stringsAsFactors = FALSE, quote = "")
+
+all_genes = subset(all_genes, all_genes$Gene.name %in% mut_list)
+
+all_genes$Karyotype_arm = gsub("\\..*","",all_genes$Karyotype.band)
+all_genes$partial_annotation = paste("(",all_genes$Chromosome.scaffold.name,")","(",all_genes$Karyotype_arm,")", sep = "")
+all_genes$full_annotation = paste("(",all_genes$Chromosome.scaffold.name,")","(",all_genes$Karyotype.band,")", sep = "")
+
+# append to mutation file
+names(all_genes)[1] = "symbol"
+
+BeatAML_aggrigate = left_join(BeatAML_aggrigate, all_genes, by = "symbol")
+
+# subset mutations to those where karyotyping data suggests deletions or amplifications
+BeatAML_aggrigate$Karyotype = gsub('\\s+', '', BeatAML_aggrigate$Karyotype)
+BeatAML_aggrigate$VAF_CN_corrected = NA
+
+for(i in 1:nrow(BeatAML_aggrigate)){
+  
+  # find whole chromosome gains or losses
+  ch_gain = paste("\\+",BeatAML_aggrigate$chrom[i], ",", sep = "")
+  ch_loss = paste("\\-",BeatAML_aggrigate$chrom[i], ",", sep = "")
+  
+  # correct for VAF based on copy number gains for that chromosome  
+  if(grepl(ch_gain, BeatAML_aggrigate$Karyotype[i]) & BeatAML_aggrigate$t_vaf[i] > 30) {BeatAML_aggrigate$VAF_CN_corrected[i] = BeatAML_aggrigate$t_vaf[i]*0.75}
+  if(grepl(ch_gain, BeatAML_aggrigate$Karyotype[i]) & BeatAML_aggrigate$t_vaf[i] <= 30) {BeatAML_aggrigate$VAF_CN_corrected[i] = BeatAML_aggrigate$t_vaf[i]*1.5}
+  # correct for VAF based on copy number loss for that chromosome
+  if(grepl(ch_loss, BeatAML_aggrigate$Karyotype[i])){ BeatAML_aggrigate$VAF_CN_corrected[i] = BeatAML_aggrigate$t_vaf[i]/2}
+  
+  # find focal chromosome gains or losses
+  locus_gain = paste("add",BeatAML_aggrigate$partial_annotation[i],"|","add",BeatAML_aggrigate$full_annotation[i], sep = "")
+  locus_loss = paste("del",BeatAML_aggrigate$partial_annotation[i],"|","del",BeatAML_aggrigate$full_annotation[i], sep = "")
+  
+  # correct for VAF based on copy number gains at the gene locus  
+  if(grepl(locus_gain, BeatAML_aggrigate$Karyotype[i]) & BeatAML_aggrigate$t_vaf[i] > 30){ BeatAML_aggrigate$VAF_CN_corrected[i] = BeatAML_aggrigate$t_vaf[i]*0.75}
+  if(grepl(locus_gain, BeatAML_aggrigate$Karyotype[i]) & BeatAML_aggrigate$t_vaf[i] <= 30){ BeatAML_aggrigate$VAF_CN_corrected[i] = BeatAML_aggrigate$t_vaf[i]*1.5}
+  # correct for VAF based on copy number loss at the gene locus
+  if(grepl(locus_loss, BeatAML_aggrigate$Karyotype[i])){ BeatAML_aggrigate$VAF_CN_corrected[i] = BeatAML_aggrigate$t_vaf[i]/2}
+  
+}
+# if no copy number differenes detected, populate the raw VAF
+for(i in 1:nrow(BeatAML_aggrigate)){
+  if(is.na(BeatAML_aggrigate$VAF_CN_corrected[i])) { BeatAML_aggrigate$VAF_CN_corrected[i] = BeatAML_aggrigate$t_vaf[i]}
+}
+
+BeatAML_aggrigate$VAF_CN_corrected = BeatAML_aggrigate$VAF_CN_corrected*100
+
+
+## Analyse all mutation relationships to a drug by performing linear regression between  VAF vs AUC 
 # select the de novo cohort for primary analysis
 pt_subset_2 <- subset(pt_subset_1, pt_subset_1$isDenovo == "TRUE" & pt_subset_1$isRelapse == "FALSE")
 
-BeatAML_variants <- BeatAML_variants %>%
-  select("labId", "symbol", "t_vaf", "short_aa_change", "chrom")
+BeatAML_variants <- BeatAML_aggrigate %>%
+  select("LabId", "symbol", "VAF_CN_corrected", "short_aa_change", "chrom")
 
 # deliniate FLT3 from FLT3-ITD
 for(i in 1:nrow(BeatAML_variants)){
   # print(i)
-  if(BeatAML_variants[i,2] == "FLT3" & BeatAML_variants[i,4] == "ITD"){
-    BeatAML_variants[i,2] <- "FLT3-ITD"
+  if(BeatAML_variants$symbol[i] == "FLT3" & BeatAML_variants$short_aa_change[i] == "ITD"){
+    BeatAML_variants$symbol[i] <- "FLT3-ITD"
   }
-  if(BeatAML_variants[i,2] == "FLT3" & BeatAML_variants[i,4] != "ITD"){
-    BeatAML_variants[i,2] <- "FLT3-TKD"
+  if(BeatAML_variants$symbol[i] == "FLT3" & BeatAML_variants$short_aa_change[i] != "ITD"){
+    BeatAML_variants$symbol[i] <- "FLT3-TKD"
   }
 }
 
 
 # filter to variants present in de novo patient samples
-BeatAML_variants_sub <- setDT(BeatAML_variants)[labId %chin% pt_subset_2$LabId] 
+BeatAML_variants_sub <- setDT(BeatAML_variants)[LabId %chin% pt_subset_2$LabId] 
 BeatAML_variants_sub <- BeatAML_variants_sub %>%
-  group_by(labId, symbol) %>%
-  filter(t_vaf == max(t_vaf)) %>%
+  group_by(LabId, symbol) %>%
+  filter(VAF_CN_corrected == max(VAF_CN_corrected)) %>%
   ungroup()
 
 BeatAML_variants_sub <- BeatAML_variants_sub %>%
-  distinct(labId, symbol, short_aa_change, .keep_all = TRUE)
+  distinct(LabId, symbol, short_aa_change, .keep_all = TRUE)
 
 # subset to mutations present in at least five samples
 mut_table <- aggregate(data.frame(count = BeatAML_variants_sub), list(value = BeatAML_variants_sub$symbol), length)
@@ -164,15 +241,18 @@ drug_mut <- cbind(drug_mut_list, drug_mut)
 drug_mut$inhibitor <- NULL
 
 drug_mut$auc <- as.numeric(drug_mut$auc)
-drug_mut$t_vaf <- as.numeric(drug_mut$t_vaf)
+drug_mut$VAF_CN_corrected <- as.numeric(drug_mut$VAF_CN_corrected)
 
 mutations <- as.data.frame(unique(drug_mut$symbol))
 inhibitors_list <- na.omit(as.data.frame(unique(drug_mut$Inhibitor)))
 
 
 ## Find cases where the vaf and auc correlate 
-dir.create("~/Desktop/MetaAML_results/Figure_6/Supplimental/drug_vaf_correlation/Resistant/")
-dir.create("~/Desktop/MetaAML_results/Figure_6/Supplimental/drug_vaf_correlation/Sensitive/")
+dir.create("~/Desktop/MetaAML_results/Figure_6/Supplimental/drug_vaf_correlation")
+dir.create("~/Desktop/MetaAML_results/Figure_6/Supplimental/drug_vaf_correlation/Resistant")
+dir.create("~/Desktop/MetaAML_results/Figure_6/Supplimental/drug_vaf_correlation")
+dir.create("~/Desktop/MetaAML_results/Figure_6/Supplimental/drug_vaf_correlation/Sensitive")
+
 
 # list for summary plots for supplimental data
 vaf_auc_sensitive_plots = list()
@@ -202,9 +282,9 @@ for(i in 1:nrow(inhibitors_list)){
     if(num_obs >= 5){
       
       # find the delta in AUN and VAF for each case in order to filter later
-      delta_vaf <- diff(range(drug_mut_sub$t_vaf))
-      min_vaf <- min(drug_mut_sub$t_vaf)
-      max_vaf <- max(drug_mut_sub$t_vaf)
+      delta_vaf <- diff(range(drug_mut_sub$VAF_CN_corrected))
+      min_vaf <- min(drug_mut_sub$VAF_CN_corrected)
+      max_vaf <- max(drug_mut_sub$VAF_CN_corrected)
       delta_auc <- diff(range(drug_mut_sub$auc))
       min_auc <- min(drug_mut_sub$auc)
       max_auc <- max(drug_mut_sub$auc)
@@ -213,7 +293,7 @@ for(i in 1:nrow(inhibitors_list)){
       if(num_obs >= 5 & delta_vaf >= 0.25 & delta_auc >= 75){
         
         # fit the data to a linear regression model
-        lmf <- lm(drug_mut_sub$t_vaf ~ drug_mut_sub$auc, data=drug_mut_sub)
+        lmf <- lm(drug_mut_sub$VAF_CN_corrected ~ drug_mut_sub$auc, data=drug_mut_sub)
         
         # calculate the slope of the line to determine if the relationship show resistance or sensitivity
         slp <-  as.numeric(coef(lmf)[2] )
@@ -246,10 +326,10 @@ for(i in 1:nrow(inhibitors_list)){
         z = z + 1
         
         # bin the plots based on their category
-        if(lmr >= 0.5 && lmp <= 0.05 && slp > 0 && delta_vaf >= 0.25 && delta_auc >= 75){
+        if(lmr >= 0.5 && lmp <= 0.05 && slp > 0 && delta_vaf >= 25 && delta_auc >= 75){
           
           # scatterplots ####
-          p1 = ggscatter(drug_mut_sub, x = "t_vaf", y = "auc",
+          p1 = ggscatter(drug_mut_sub, x = "VAF_CN_corrected", y = "auc",
                          color = "black", fill = "#4393c3", size = 5, shape = 21,
                          font.label = list(color = "black", size = 9, vjust = 0.5),
                          title = paste(drug_sig, " vs. ", mut_sig, sep = ""),
@@ -261,20 +341,20 @@ for(i in 1:nrow(inhibitors_list)){
             theme(plot.title = element_text(hjust = 0.5)) +
             stat_cor(
               aes(label = paste(..rr.label.., ..p.label.., sep = "~`,`~")),
-              label.x = 0.1,
+              label.x = 10,
               label.y = (max_auc + 50)
             )
           
-          vaf_auc_sensitive_plots[[k]] = p1
+          vaf_auc_resistant_plots[[k]] = p1
           
           k = k + 1
           
           ggsave(filename = paste("~/Desktop/MetaAML_results/Figure_6/Supplimental/drug_vaf_correlation/Resistant/",drug_sig,"_",mut_sig,".pdf", sep = ""), dpi = 300, width = 3, height = 3, units = "in")
         }
-        if(lmr >= 0.5 && lmp <= 0.05 && slp < 0 && delta_vaf >= 0.25 && delta_auc >= 75){
+        if(lmr >= 0.5 && lmp <= 0.05 && slp < 0 && delta_vaf >= 25 && delta_auc >= 75){
           
           # make the scatterplot
-          p2 = ggscatter(drug_mut_sub, x = "t_vaf", y = "auc",
+          p2 = ggscatter(drug_mut_sub, x = "VAF_CN_corrected", y = "auc",
                          color = "black", fill = "#b2182b", size = 5,shape = 21,
                          font.label = list(color = "black", size = 9, vjust = 0.5),
                          title = paste(drug_sig, " vs. ", mut_sig, sep = ""),
@@ -286,11 +366,11 @@ for(i in 1:nrow(inhibitors_list)){
             theme(plot.title = element_text(hjust = 0.5)) +
             stat_cor(
               aes(label = paste(..rr.label.., ..p.label.., sep = "~`,`~")),
-              label.x = 0.1,
+              label.x = 10,
               label.y = (max_auc + 50)
             )
           
-          vaf_auc_resistant_plots[[l]] = p2
+          vaf_auc_sensitive_plots[[l]] = p2
           l = l + 1
           
           ggsave(filename = paste("~/Desktop/MetaAML_results/Figure_6/Supplimental/drug_vaf_correlation/Sensitive/",drug_sig,"_",mut_sig,".pdf", sep = ""), dpi = 300, width = 3, height = 3, units = "in")
@@ -316,7 +396,7 @@ p = cowplot::plot_grid(plotlist = sensitive,
                        rel_heights = c(1,1),
                        rel_widths = c(1,1))
 
-ggsave(filename ="~/Desktop/MetaAML_results/Figure_6/Supplimental/sensitive_matrix.png", dpi = 150, width = 16, height = 8, units = "in")
+ggsave(filename ="~/Desktop/MetaAML_results/Figure_6/Supplimental/sensitive_matrix.png", dpi = 150, width = 18, height = 15, units = "in")
 
 # resistant
 resistant = list.clean(vaf_auc_resistant_plots)
@@ -326,7 +406,7 @@ p = cowplot::plot_grid(plotlist = resistant,
                        rel_heights = c(1,1),
                        rel_widths = c(1,1))
 
-ggsave(filename ="~/Desktop/MetaAML_results/Figure_6/Supplimental/resistant_matrix.png", dpi = 150, width = 18, height = 15, units = "in")
+ggsave(filename ="~/Desktop/MetaAML_results/Figure_6/Supplimental/resistant_matrix.png", dpi = 150, width = 16, height = 8, units = "in")
 
 
 # drug families for significant trends
@@ -347,7 +427,7 @@ sig_genes_drug_classes = left_join(sig_associations, drug_classes, by = "Inhibit
 
 # summary plots ####
 # plot heatmaps of the delta AUC and delta VAF for the significant cases
-vaf_data <- subset(beatAML_auc_vaf_comparison, beatAML_auc_vaf_comparison$R_squared >= 0.5 & beatAML_auc_vaf_comparison$VAF_range >= 0.25 & beatAML_auc_vaf_comparison$AUC_range >= 75)
+vaf_data <- subset(beatAML_auc_vaf_comparison, beatAML_auc_vaf_comparison$R_squared >= 0.5 & beatAML_auc_vaf_comparison$VAF_range >= 25 & beatAML_auc_vaf_comparison$AUC_range >= 75)
 
 vaf_data$sensitivity <- NA
 
@@ -374,9 +454,36 @@ for(i in 1:nrow(vaf_data)){
   }
 }
 
-# plot the heatmap
+
+# plot the heatmap for the most significant cases
+
+vaf_data_sub = subset(vaf_data, vaf_data$p_value < 0.05)
+
+p = ggplot(vaf_data_sub, aes(reorder(Mutated_Gene, -count.Inhibitor), reorder(Inhibitor, count.Inhibitor), colour = AUC_range, size = VAF_range, label = star)) +
+  geom_point() +
+  theme_cowplot() +
+  scale_color_gradient2(low = "#b2182b", high = "#2166ac", mid = "#f7f7f7",
+                        name=expression(Delta~"AUC")) +
+  geom_point(shape = 21, color = "black") +
+  theme(axis.text.x = element_text(angle = 45, vjust = 1, 
+                                   size = 12, hjust = 1),
+        panel.grid.major = element_line(size = 0.5, linetype = 'solid',
+                                        colour = "#f0f0f0"))+
+  xlab(label= NULL) +
+  ylab(label="Inhibitor") +
+  labs(title = NULL) +
+  geom_text(size = 7.5, color = "#525252",  hjust = 0, nudge_x = 0.25)
+
+g = guide_legend(override.aes=list(colour="lightgrey"), expression(Delta~"VAF"))
+p + guides(size = g)
+
+ggsave(filename = "~/Desktop/MetaAML_results/Figure_6/drug_vaf_correlation_summary_plot.pdf", dpi = 300, width = 5.5, height =  7.5, units = "in")
+
+
+# plot the heatmap for everything
 p = ggplot(vaf_data, aes(reorder(Mutated_Gene, -count.Inhibitor), reorder(Inhibitor, count.Inhibitor), colour = AUC_range, size = VAF_range, label = star)) +
   geom_point() +
+  theme_cowplot() +
   scale_color_gradient2(low = "#b2182b", high = "#2166ac", mid = "#f7f7f7",
                         name=expression(Delta~"AUC")) +
   geom_point(shape = 21, color = "black") +
@@ -400,8 +507,11 @@ ggsave(filename = "~/Desktop/MetaAML_results/Figure_6/Supplimentary/drug_vaf_cor
 
 # binary analysis ####
 ## loop through all gene/drug interactions and calculate the p-value for a t.test between mutated and non-mutated samples for each drug
-
+dir.create("~/Desktop/MetaAML_results/Figure_6/drug_vaf_correlation")
+dir.create("~/Desktop/MetaAML_results/Figure_6/drug_vaf_correlation/binary")
 dir.create("~/Desktop/MetaAML_results/Figure_6/drug_vaf_correlation/binary/sensitive")
+
+dir.create("~/Desktop/MetaAML_results/Figure_6/drug_vaf_correlation/binary")
 dir.create("~/Desktop/MetaAML_results/Figure_6/drug_vaf_correlation/binary/resistant")
 
 BeatAML_variants <- read_excel("~/Desktop/MetaAML_results/raw_data/41586_2018_623_MOESM3_ESM.xlsx", sheet = 7)
@@ -604,7 +714,7 @@ names(mut_table_2)[1]<-"Mutated_Gene"
 
 beatAML_sensitivity_difference <- dplyr::left_join(beatAML_sensitivity_difference, mut_table_2, by = "Mutated_Gene")
 
-write.csv(beatAML_sensitivity_difference, "~/Desktop/MetaAML_results/Figure_6/binary_results.csv", row.names=FALSE)
+write.csv(beatAML_sensitivity_difference, "~/Desktop/MetaAML_results/Figure_6/binary_drug_results.csv", row.names=FALSE)
 
 # beatAML_sensitivity_difference = read.csv("~/Desktop/MetaAML_results/Data/Figures/drug_vaf_correlation/binary_response.csv")
 
@@ -626,7 +736,7 @@ g = guide_legend("Number of\nsamples")
 # h = guide_legend("")
 p + guides(size = g)
 
-ggsave(filename = "~/Desktop/MetaAML_results/Figure_6/binary_results.pdf", dpi = 300, width = 6, height = 4, units = "in")
+ggsave(filename = "~/Desktop/MetaAML_results/Figure_6/binary_drug_results.pdf", dpi = 300, width = 6, height = 4, units = "in")
 
 # delete large dataframes
 rm(drug_list)
@@ -636,7 +746,7 @@ rm(datalist_beatAML)
 
 # overlap ####
 # overlap of significant hits for both approaches using an upset plot
-binary_results=read.csv("~/Desktop/MetaAML_results/Figure_6/binary_results.csv")
+binary_results=read.csv("~/Desktop/MetaAML_results/Figure_6/binary_drug_results.csv")
 binary_results=subset(binary_results, binary_results$fdr_adjusted <= 0.05)
 binary_sensitive=subset(binary_results, binary_results$auc_diff < 0)
 binary_resistant=subset(binary_results, binary_results$auc_diff > 0)
@@ -691,63 +801,8 @@ dev.off()
 
 
 
-# vaf distribution ####
-
-BeatAML_sample_data_types <- read_excel("~/Desktop/MetaAML_results/raw_data/41586_2018_623_MOESM3_ESM.xlsx", sheet = 5)
-
-# subset to patients with required data types
-pt_subset_1 <- subset(BeatAML_sample_data_types, BeatAML_sample_data_types$exomeSeq == "y" & BeatAML_sample_data_types$totalDrug == "y")
-
-pt_subset <- subset(BeatAML_sample_data_types, BeatAML_sample_data_types$isRelapse == "FALSE" &  BeatAML_sample_data_types$isDenovo == "TRUE")
-
-
-# read in BeatAML variants for analysis data
-BeatAML_variants <- read_excel("~/Desktop/MetaAML_results/raw_data/41586_2018_623_MOESM3_ESM.xlsx", sheet = 7)
-
-BeatAML_variants <- BeatAML_variants %>%
-  select("labId", "symbol", "t_vaf", "variant_class", "chrom")
-
-
-## filter to variants present in specific disease settings
-BeatAML_variants <- setDT(BeatAML_variants)[labId %chin% pt_subset$LabId]
-BeatAML_variants <- BeatAML_variants %>%
-  distinct(labId, symbol, .keep_all = TRUE)
-
-mut_table <- aggregate(data.frame(count = BeatAML_variants), list(value = BeatAML_variants$symbol), length)
-mut_table <- select(mut_table, "value", "count.symbol")
-mut_table <- subset(mut_table, mut_table$count.symbol >= 5)
-
-Beat_AML_muts <- setDT(BeatAML_variants)[symbol %chin% mut_table$value] 
-
-Beat_AML_muts[] <- lapply(Beat_AML_muts, gsub, pattern = "deletion", replacement = "Del", fixed = TRUE)
-Beat_AML_muts[] <- lapply(Beat_AML_muts, gsub, pattern = "insertion", replacement = "Ins", fixed = TRUE)
-Beat_AML_muts[] <- lapply(Beat_AML_muts, gsub, pattern = "tandem_duplication", replacement = "ITD", fixed = TRUE)
-
-Beat_AML_muts$t_vaf=as.numeric(Beat_AML_muts$t_vaf)
-
-Beat_AML_muts$symbol <- with(Beat_AML_muts, reorder(symbol, -t_vaf, median))
-
-p = ggplot(Beat_AML_muts, aes(x=symbol, y=t_vaf)) + 
-  geom_boxplot(notch=F, outlier.colour = "white", color = "#374E55FF", fill = "lightgrey") +
-  geom_jitter(aes(fill = variant_class), color = "black", shape = 21, position=position_jitter(0.2), size = 2) +
-  scale_fill_manual(values = c("#6A6599FF", "#DF8F44FF","#79AF97FF","#B24745FF")) +
-  # geom_jitter(shape=21, position=position_jitter(0.2)) +
-  theme_cowplot(font_size = 10) +
-  labs(title = NULL) +
-  ylab(label= "VAF") +
-  xlab(label = NULL) +
-  theme(legend.position="right") +
-  theme(axis.text.x = element_text(angle = 45, vjust = 1, 
-                                   size = 10, hjust = 1))
-
-ggpar(p, legend.title = "Variant class")
-
-ggsave(filename = "~/Desktop/MetaAML_results/Figure_6/vaf_distribution_de_novo.pdf", dpi = 300, width = 7, height = 4.5, units = "in")
-
-
-
-
 # co-occuring mutations and FLT3 vaf regression ####
+dir.create("~/Desktop/MetaAML_results/Figure_6/FLT3_specific")
 dir.create("~/Desktop/MetaAML_results/Figure_6/FLT3_specific/Resistant")
 dir.create("~/Desktop/MetaAML_results/Figure_6/FLT3_specific/Sensitive")
 
@@ -765,7 +820,7 @@ for(i in 1:length(background_genotype)){
   
   # subset based on flt3-itd cases
   drug_mut_sub = setDT(drug_mut_sub)[lab_id %chin% flt3_itd_samples$lab_id]
-  drug_mut_sub = select(drug_mut_sub, lab_id, symbol, t_vaf)
+  drug_mut_sub = select(drug_mut_sub, lab_id, symbol, VAF_CN_corrected)
   names(drug_mut_sub) = c("lab_id", "gene2", "gene2_vaf")
   
   itd = inner_join(flt3_itd_samples, drug_mut_sub, by = "lab_id")
@@ -773,7 +828,7 @@ for(i in 1:length(background_genotype)){
   # subset based on flt3-tkd cases
   drug_mut_sub = subset(drug_mut, drug_mut$symbol == background_genotype[i]) 
   drug_mut_sub = setDT(drug_mut_sub)[lab_id %chin% flt3_tkd_samples$lab_id]
-  drug_mut_sub = select(drug_mut_sub, lab_id, symbol, t_vaf)
+  drug_mut_sub = select(drug_mut_sub, lab_id, symbol, VAF_CN_corrected)
   names(drug_mut_sub) = c("lab_id", "gene2", "gene2_vaf")
   
   tkd = inner_join(flt3_tkd_samples, drug_mut_sub, by = "lab_id")
@@ -803,9 +858,9 @@ for(i in 1:length(background_genotype)){
       if(nrow(sub) >= 5){
         # print(i)
         # find the delta in AUN and VAF for each case in order to filter later
-        delta_vaf <- as.numeric(diff(range(sub$t_vaf)))
-        min_vaf <- as.numeric(min(sub$t_vaf))
-        max_vaf <- as.numeric(max(sub$t_vaf))
+        delta_vaf <- as.numeric(diff(range(sub$VAF_CN_corrected)))
+        min_vaf <- as.numeric(min(sub$VAF_CN_corrected))
+        max_vaf <- as.numeric(max(sub$VAF_CN_corrected))
         delta_auc <- as.numeric(diff(range(sub$auc)))
         min_auc <- as.numeric(min(sub$auc))
         max_auc <- as.numeric(max(sub$auc))
@@ -850,7 +905,7 @@ for(i in 1:length(background_genotype)){
           if(lmr >= 0.5 && lmp <= 0.05 && slp > 0 && delta_vaf >= 0.25 && delta_auc >= 75){
             
             # scatterplots ####
-            p1 = ggscatter(sub, x = "t_vaf", y = "auc",
+            p1 = ggscatter(sub, x = "VAF_CN_corrected", y = "auc",
                            color = "black", fill = "#4393c3", size = 5, shape = 21,
                            font.label = list(color = "black", size = 9, vjust = 0.5),
                            title = paste(drug_sig, "\n", mut_sig, " + ", flt3_type, sep = ""),
@@ -873,7 +928,7 @@ for(i in 1:length(background_genotype)){
           if(lmr >= 0.5 && lmp <= 0.05 && slp < 0 && delta_vaf >= 0.25 && delta_auc >= 75){
             #   
             # make the scatterplot
-            p2 = ggscatter(sub, x = "t_vaf", y = "auc",
+            p2 = ggscatter(sub, x = "VAF_CN_corrected", y = "auc",
                            color = "black", fill = "#b2182b", size = 5,shape = 21,
                            font.label = list(color = "black", size = 9, vjust = 0.5),
                            title = paste(drug_sig, "\n", mut_sig, " + ", flt3_type, sep = ""),
