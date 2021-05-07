@@ -1,8 +1,8 @@
 # ========================================================================================================================================== #
 # Figure_1.R
 # Author : Brooks Benard, bbenard@stanford.edu
-# Date: 09/01/2020
-# Description: Curation of multiple sequencing studies in AML into one dataframe for meta analysis of mutational and clinical correlations. This script will pull published data from AML sequencing studies, homogenize annotations and coding where possible, and plot an UpSet plot and oncoprint of the cohort as seen in Figure 1 of the manuscript Benard et al. "Clonal architecture and variant allele frequency correlate with clinical outcomes and drug response in acute myeloid leukemia".
+# Date: 03/16/2021
+# Description: Curation of multiple sequencing studies in AML into one dataframe for meta analysis of mutational and clinical correlations. This script will pull published data from AML sequencing studies, homogenize annotations and coding where possible, and plot an UpSet plot and oncoprint of the cohort as seen in Figure 1 (and related suppliments) of the manuscript Benard et al. "Clonal architecture and variant allele frequency correlate with clinical outcomes and drug response in acute myeloid leukemia".
 # ========================================================================================================================================== #
 
 # =================== #
@@ -133,30 +133,73 @@ colnames(pt_subset_2)[1] <- "labId"
 
 
 # Mutations
-# read in BeatAML variants for analysis
-BeatAML_variants <- read_excel("~/Desktop/MetaAML_results/raw_data/41586_2018_623_MOESM3_ESM.xlsx", sheet = 7)
+# # read in BeatAML variants for analysis
+# BeatAML_variants <- read_excel("~/Desktop/MetaAML_results/raw_data/41586_2018_623_MOESM3_ESM.xlsx", sheet = 7)
+# 
+# # extract useful columns
+# BeatAML_variants_sub <- BeatAML_variants %>%
+#   dplyr::select("labId", "symbol", "t_vaf", "variant_class", "short_aa_change")
+# 
+# # make sure column names are consistent across datasets
+# colnames(BeatAML_variants_sub)[4:5] <- c("variant_type", "amino_acid_change")
+# 
+# # remove duplicate calls
+# BeatAML_variants_sub <- BeatAML_variants_sub %>%
+#   distinct(labId, symbol, t_vaf, .keep_all = T)
+# 
+# # filter to variants present in the patient group and ensure no duplicate pts are represented
+# BeatAML_variants_sub <- setDT(BeatAML_variants_sub)[labId %chin% pt_subset_2$labId]
+# BeatAML_variants_sub <- unique(BeatAML_variants_sub)
+# colnames(BeatAML_variants_sub)[3] <- "VAF"
+# # combined <- BeatAML_variants_sub
+# BeatAML_variants_sub$VAF <- as.numeric(BeatAML_variants_sub$VAF)
+# BeatAML_variants_sub$VAF <- BeatAML_variants_sub$VAF*100
+# 
+# 
+# colnames(BeatAML_variants_sub)[4] <- c("variant_type")
+
+# VAF correction ####
+# correct the VAFs based on reported cytogenetic data per patient
+# read in BeatAML variants for analysis'
+BeatAML_variants <- read_excel("~/Desktop/MetaAML_results/raw_data/41586_2018_623_MOESM3_ESM.xlsx", sheet = 7, col_names = TRUE)
 
 # extract useful columns
 BeatAML_variants_sub <- BeatAML_variants %>%
-  dplyr::dplyr::select("labId", "symbol", "t_vaf", "variant_class", "short_aa_change")
+  dplyr::select("labId", "symbol", "chrom", "t_vaf", "variant_class", "short_aa_change", "genotyper")
 
-# make sure column names are consistent across datasets
-colnames(BeatAML_variants_sub)[4:5] <- c("variant_type", "amino_acid_change")
+## Keeping only the hits that are found by both mutect and varscan. Also keeping all pindel hits
+# arrange by VAF in descending order so that we keep only the highest VAF from overlapping hits
+BeatAML <- BeatAML_variants_sub %>%
+  arrange(desc(t_vaf))
 
-# remove duplicate calls
-BeatAML_variants_sub <- BeatAML_variants_sub %>%
-  distinct(labId, symbol, t_vaf, .keep_all = T)
+# create new data frame with the columns needed to determine mutation overlaps 
+overlaps <- BeatAML %>%
+  select(labId, symbol, short_aa_change)
 
-# filter to variants present in the patient group and ensure no duplicate pts are represented
-BeatAML_variants_sub <- setDT(BeatAML_variants_sub)[labId %chin% pt_subset_2$labId]
-BeatAML_variants_sub <- unique(BeatAML_variants_sub)
-colnames(BeatAML_variants_sub)[3] <- "VAF"
-# combined <- BeatAML_variants_sub
-BeatAML_variants_sub$VAF <- as.numeric(BeatAML_variants_sub$VAF)
-BeatAML_variants_sub$VAF <- BeatAML_variants_sub$VAF*100
+# create a column in BeatAML where TRUE if the value is duplicated earlier in the data table (does not put TRUE for first instance of that duplicate)
+BeatAML$duplicates <- NA
+BeatAML$duplicates <- duplicated(overlaps)
 
+# create a column that lists TRUE if the row should be kept and FALSE if it should be removed
+BeatAML$keep <- NA
+for (i in 1:nrow(BeatAML)) {
+  if (BeatAML$genotyper[i] == "pindel" | BeatAML$duplicates[i] | BeatAML$symbol[i] == "NPM1") {
+    BeatAML$keep[i] <- TRUE
+  } else {
+    BeatAML$keep[i] <- FALSE
+  }
+}
 
-colnames(BeatAML_variants_sub)[4] <- c("variant_type")
+# keep only those that are true in keep column
+BeatAML <- BeatAML[which(BeatAML$keep),]
+
+## change back to being arranged by LabId
+BeatAML_variants_sub <- BeatAML %>%
+  arrange(labId)
+
+BeatAML_variants_sub = BeatAML_variants_sub %>% select(labId, symbol, t_vaf, variant_class, short_aa_change)
+names(BeatAML_variants_sub) = c("labId", "symbol", "VAF", "variant_type", "amino_acid_change")
+BeatAML_variants_sub$VAF = BeatAML_variants_sub$VAF*100
 
 combined <- left_join(BeatAML_variants_sub, pt_subset_2, by = "labId")
 combined$Cohort <- "Tyner"
@@ -182,7 +225,7 @@ for (i in 1:nrow(mut_table_final_TCGA_sub)) {
 # make sure the column headers are the same for rowbind
 cnames <- colnames(combined)
 mut_table_final_TCGA_sub$specimenType <- "bone_marrow"
-mut_table_final_TCGA_sub <- mut_table_final_TCGA_sub[c(1:7,9,8)]
+mut_table_final_TCGA_sub <- mut_table_final_TCGA_sub[,c(1:7,9,8)]
 colnames(mut_table_final_TCGA_sub) <- cnames
 
 # remove duplicate rows in both column prior to merging
@@ -354,6 +397,10 @@ combined2 <- rbind.fill(combined1, temp_final_flt3)
 
 combined2$`% Blasts` = NULL
 
+# colnames(combined2)[10] = "BM_blast_percent"
+
+# combined2$BM_blast_percent <- gsub('-', 'NA', combined2$BM_blast_percent)
+
 
 # ======================== #
 # Papaemmanuil et al. ####
@@ -467,118 +514,11 @@ for(i in 1:nrow(joined_muts_clinical)){
 
 # normalize the VAF to decimal format to match other datasets
 joined_muts_clinical$VAF <- as.numeric(joined_muts_clinical$VAF, na.rm = T)
-joined_muts_clinical$VAF <- (joined_muts_clinical$VAF/100)
+# joined_muts_clinical$VAF <- (joined_muts_clinical$VAF/100)
 
 # add cohort annotation
 joined_muts_clinical$Cohort <- "Papaemmanuil"
 
-###
-##
-# now, modifying some supplimental code from Gerstung et al. 2016, perform copy number correction on VAFs using avaliable karyotype data and append a column to the mutation table
-
-# 1.3.2.1 Clinical data
-download.file("https://github.com/gerstung-lab/AML-multistage/blob/master/data/AMLSG_Clinical_Anon.RData?raw=true", destfile = "~/Desktop/MetaAML_results/raw_data/AMLSG_Clinical_Anon.RData")
-
-load("~/Desktop/MetaAML_results/raw_data/AMLSG_Clinical_Anon.RData")
-
-# 1.3.2.2 Mutation data
-download.file("https://raw.githubusercontent.com/gerstung-lab/AML-multistage/master/data/AMLSG_Genetic.txt", destfile = "~/Desktop/MetaAML_results/raw_data/AMLSG_Genetic.txt")
-
-mutationData = read.table("~/Desktop/MetaAML_results/raw_data/AMLSG_Genetic.txt", sep="\t", header=TRUE, strip.white = TRUE) 
-mutationData$SAMPLE_NAME <- factor(as.character(mutationData$SAMPLE_NAME), levels = levels(clinicalData$PDID)) 
-## Refactor
-mutationTable <- (table(mutationData[mutationData$Result %in% c("ONCOGENIC","POSSIBLE") & mutationData$FINAL_CALL == "OK" ,c("SAMPLE_NAME","GENE")]) > 0)+0
-dim(mutationTable)
-
-all(rownames(mutationTable)==clinicalData$PDID)
-
-# 1.3.4 Covariates
-dataList <-list(Genetics = data.frame(mutationTable[,colSums(mutationTable)>0]),
-                Cytogenetics = clinicalData[,grep("^(t_)|(inv)|(abn)|(plus)|(minus)|(mono)|(complex)",colnames(clinicalData))])
-#
-dataList$Genetics$CEBPA <- clinicalData$CEBPA # encoded as 0,1,2 
-dataList$Genetics$CEBPA_mono <- clinicalData$CEBPA == 1 # encoded as 0,1,2 
-dataList$Genetics$CEBPA_bi <- clinicalData$CEBPA == 2 # encoded as 0,1,2 
-dataList$Genetics$CEBPA <- NULL
-dataList$Genetics$FLT3 <- NULL
-dataList$Genetics$FLT3_ITD <- clinicalData$FLT3_ITD != "0"
-dataList$Genetics$FLT3_TKD <- clinicalData$FLT3_TKD != "0"
-dataList$Genetics$FLT3_other <- clinicalData$FLT3_other != "0"
-dataList$Genetics$IDH2_p172 <- table(mutationData$SAMPLE_NAME[mutationData$GENE=='IDH2' & grepl("172", mutationData$AA_CHANGE)])[]
-dataList$Genetics$IDH2_p140 <- table(mutationData$SAMPLE_NAME[mutationData$GENE=='IDH2' & grepl("140", mutationData$AA_CHANGE)])[]
-dataList$Genetics$IDH2 <- NULL
-dataList$Genetics$NPM1 <- clinicalData$NPM1
-dataList$Cytogenetics$MLL_PTD <- NULL
-dataList$Genetics = dataList$Genetics + 0
-
-
-# Condensing to a data.frame
-dataRaw <- do.call(cbind,dataList)
-names(dataRaw) <- unlist(sapply(dataList, names)) 
-
-# download the karyotype data
-download.file("https://github.com/gerstung-lab/AML-multistage/raw/master/data/AMLSG_Karyotypes.txt", destfile = "~/Desktop/MetaAML_results/raw_data/AMLSG_Karyotypes.txt")
-
-# here is the code that accounts for broad copy number status correction of VAFs based on karyotype
-# 1.3.5 Subclonal mutations
-copyNumbers = cbind(dataList$Cytogenetics[grep(c("minus|plus|mono"), colnames(dataList$Cytogenetics))], clinicalData$gender)
-copyNumbers$minus7 <- (copyNumbers$minus7 | copyNumbers$minus7q) + 0
-copyNumbers$minus7q <- NULL
-
-for(i in 1:ncol(copyNumbers)){
-  if(grepl("plus", colnames(copyNumbers)[i])){
-    copyNumbers[,i] = copyNumbers[,i]*3
-  }
-}
-copyNumbers[copyNumbers==0 | is.na(copyNumbers)] = 2
-colnames(copyNumbers) = c(5,7,8,9,12,13,17,18,20,21,22,"Y",11,4,"X")
-rownames(copyNumbers) <- clinicalData$PDID
-
-minusY = dataList$Cytogenetics$minusY[is.na(dataList$Cytogenetics$minusY)] <- 0
-
-copyNumbers$Y <- c(1:0)[clinicalData$gender] - minusY
-cn = sapply(1:nrow(mutationData), function(i) {
-  c=copyNumbers[mutationData$SAMPLE_NAME[i],match(mutationData$CHR[i ], colnames(copyNumbers))]; if(length(c)==0) 2 else c
-}
-)
-vaf <- as.numeric(as.character(mutationData$X._MUT_IN_TUM))
-
-depth <- as.numeric(as.character(mutationData$TUM_DEPTH))
-
-
-CNA = data.frame(cn)
-rownames(CNA) = rownames(mutationData)
-colnames(CNA) = "CNA"
-
-mutationData$CN_status = as.numeric(CNA$CNA)
-mutationData$VAF = as.numeric(mutationData$VAF)
-mutationData$CN_status =mutationData$CN_status %>% replace_na(2)
-mutationData$VAF_CN_corrected = mutationData$VAF
-
-for(i in 1:nrow(mutationData)){
-  if(mutationData$CN_status[i] == 1){
-    mutationData$VAF_CN_corrected[i] = mutationData$VAF[i]/2
-  }
-  if(mutationData$CN_status[i] == 3){
-    mutationData$VAF_CN_corrected[i] = mutationData$VAF[i]*1.5
-  }
-}
-
-for(i in 1:nrow(mutationData)){
-  if(!is.na(mutationData$VAF_CN_corrected[i])){
-    if(mutationData$VAF_CN_corrected[i] > 100){
-      mutationData$VAF_CN_corrected[i] = 100
-    }
-  }
-}
-
-# extract useful columns and append to mutation
-mutationData = dplyr::select(mutationData, Study_Variant_ID, VAF_CN_corrected)
-
-mutationData$Study_Variant_ID = as.numeric(mutationData$Study_Variant_ID)
-joined_muts_clinical$Study_Variant_ID = as.numeric(joined_muts_clinical$Study_Variant_ID)
-
-joined_muts_clinical = left_join(joined_muts_clinical, mutationData, by = "Study_Variant_ID")
 
 
 # ======================= #
@@ -607,12 +547,12 @@ colnames(final_data_matrix_sub)[1] <- "Sample"
 # clinical data
 TCGA_survival <- read.table("~/Desktop/MetaAML_results/raw_data/data_clinical_patient.txt", header = T, stringsAsFactors = F, sep = "\t")
 
-TCGA_survival2 <- dplyr::select(TCGA_survival, PATIENT_ID, OS_STATUS, OS_MONTHS, SEX, AGE, CYTOGENETIC_CODE_OTHER, RISK_MOLECULAR, BM_BLAST_PERCENTAGE, PB_BLAST_PERCENTAGE, WBC)
+TCGA_survival2 <- dplyr::select(TCGA_survival, PATIENT_ID, OS_STATUS, OS_MONTHS, SEX, AGE, CYTOGENETIC_CODE_OTHER, RISK_MOLECULAR, BM_BLAST_PERCENTAGE, PB_BLAST_PERCENTAGE, WBC, FAB)
 # need to convert tcga data from months to days
 TCGA_survival2$OS_MONTHS <- (TCGA_survival2$OS_MONTHS*30)
 
 # Beat AML (Tyner et al.)
-BeatAML_survival2 <- dplyr::select(BeatAML_sample_data_types,  LabId, PatientId, vitalStatus, overallSurvival, consensus_sex, ageAtDiagnosis, Karyotype, ELN2017, `%.Blasts.in.BM`, `%.Blasts.in.PB`, WBC.Count, Hemoglobin, LDH, Platelet.Count)
+BeatAML_survival2 <- dplyr::select(BeatAML_sample_data_types,  LabId, PatientId, vitalStatus, overallSurvival, consensus_sex, ageAtDiagnosis, Karyotype, ELN2017, `%.Blasts.in.BM`, `%.Blasts.in.PB`, WBC.Count, Hemoglobin, LDH, Platelet.Count, `FAB/Blast.Morphology`)
 
 # Stanford Majeti lab
 # survival data
@@ -634,9 +574,9 @@ Stanford_survival2 = left_join(Stanford_survival2, labels, by = "Sample")
 Multistage_survival2 <- dplyr::select(Multistage_survival, PDID, Status, OS, gender, AOD, complex, M_Risk, BM_Blasts, PB_Blasts, wbc, HB, LDH, platelet)
 
 # make all the headers the same
-colnames(TCGA_survival2) <- c("Sample", "Censor", "Time_to_OS", "Sex", "Age", "Cytogenetics", "Risk", "BM_blast_percent", "PB_blast_percent", "WBC")
+colnames(TCGA_survival2) <- c("Sample", "Censor", "Time_to_OS", "Sex", "Age", "Cytogenetics", "Risk", "BM_blast_percent", "PB_blast_percent", "WBC", "FAB")
 
-colnames(BeatAML_survival2) <- c("Sample", "PatientId", "Censor", "Time_to_OS", "Sex", "Age", "Cytogenetics", "Risk", "BM_blast_percent", "PB_blast_percent", "WBC", "Hemoglobin", "LDH", "Platelet")
+colnames(BeatAML_survival2) <- c("Sample", "PatientId", "Censor", "Time_to_OS", "Sex", "Age", "Cytogenetics", "Risk", "BM_blast_percent", "PB_blast_percent", "WBC", "Hemoglobin", "LDH", "Platelet", "FAB")
 # BeatAML_survival2$Cohort <- "Tyner"
 
 colnames(Stanford_survival2) <- c("Sample", "Censor", "Time_to_OS", "Sex", "Age", "Cytogenetics", "Risk", "BM_blast_percent")
@@ -702,7 +642,7 @@ for(i in 1:nrow(final_data_matrix)){
 final_data_matrix <- final_data_matrix[!duplicated(final_data_matrix), ]
 
 
-
+final_data_matrix_temp = final_data_matrix
 
 # ========================== #
 # Other smaller cohorts ####
@@ -740,7 +680,7 @@ for(i in 1:nrow(lindsley)){
     lindsley$variant_type[i] = "ITD"
   }
 }
-
+lindsley$VAF = as.numeric(lindsley$VAF)
 lindsley$VAF = lindsley$VAF*100
 
 # n_distinct(lindsley$Sample)
@@ -770,8 +710,8 @@ for(i in 1:nrow(wang)){
 # BMC_2016_Au ####
 Au <- read_excel("~/Desktop/MetaAML_results/Data/BMC_2016_Au.xlsx")
 Au <- Au %>% separate(`Sex/Age`, sep = "/", into = c("Sex", "Age"))
-Au <- Au[,c(1:4,6,8,9)]
-colnames(Au) <- c("Sample", "Sex", "Age", "Subset", "Cytogenetics", "symbol", "amino_acid_change")
+Au <- Au[,c(1:4,6,8,9,5)]
+colnames(Au) <- c("Sample", "Sex", "Age", "Subset", "Cytogenetics", "symbol", "amino_acid_change", "FAB")
 Au$variant_type = NA
 
 Au$Cohort <- "Au"
@@ -786,8 +726,8 @@ colnames(welch_mut)[1:5] <- c("Sample", "symbol", "amino_acid_change", "variant_
 # welch_mut$VAF <- (welch_mut$VAF/100)
 
 welch_clinical <- read_excel("~/Desktop/MetaAML_results/Data/NEJM_2016_Welch_clinical.xlsx")
-welch_clinical <- na.omit(dplyr::select(welch_clinical, 1,3,5:9,18:21))
-colnames(welch_clinical) <- c("Sample", "Subset", "Age", "Sex", "PB_wbc_percent", "PB_blast_percent", "BM_blast_percent", "Time_to_OS", "Censor", "Risk", "Cytogenetics")
+welch_clinical <- na.omit(dplyr::select(welch_clinical, 1,3,5:9,18:21, 10))
+colnames(welch_clinical) <- c("Sample", "Subset", "Age", "Sex", "PB_wbc_percent", "PB_blast_percent", "BM_blast_percent", "Time_to_OS", "Censor", "Risk", "Cytogenetics", "FAB")
 
 # combind mutations and clinical together
 welch <- left_join(welch_mut, welch_clinical, by = "Sample")
@@ -813,6 +753,11 @@ welch$Cohort <- "Welch"
 ## ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 final_data_matrix <- rbind.fill(final_data_matrix, lindsley, wang, Au, welch)
+
+# final_data_matrix$BM_blast_percent.y = NULL
+final_data_matrix$PatientId.y = NULL
+
+names(final_data_matrix)[7] = "PatientId"
 
 
 final_data_matrix$variant_type[is.na(final_data_matrix$variant_type)] <- "Unknown"
@@ -868,9 +813,9 @@ garg_data <- garg_data[grep("DX", garg_data$`Status in Disease`), ]
 garg_data <- garg_data %>% separate(`Age/ Sex`, sep = "/", into = c("Age", "Sex"))
 
 # subset to useful columns
-garg_data <- dplyr::select(garg_data, `Sample ID`, `Annotated Gene`, `Mutation Type`, `Amino Acid Change`, 21, `Dead/ Alive`, Sex, Age, `Cytogenetic (DX)`)
+garg_data <- dplyr::select(garg_data, `Sample ID`, `Annotated Gene`, `Mutation Type`, `Amino Acid Change`, 21, `Dead/ Alive`, Sex, Age, `Cytogenetic (DX)`, FAB)
 
-colnames(garg_data) <- c("Sample", "symbol", "variant_type", "amino_acid_change", "Time_to_OS", "Censor", "Sex", "Age", "Cytogenetics")
+colnames(garg_data) <- c("Sample", "symbol", "variant_type", "amino_acid_change", "Time_to_OS", "Censor", "Sex", "Age", "Cytogenetics", "FAB")
 
 garg_data$Subset <- "de_novo"
 
@@ -1021,6 +966,8 @@ for(i in 1:nrow(huet)){
   }
 }
 
+huet$Risk = ifelse(huet$Risk == "apart", NA, huet$Risk)
+
 final_data_matrix <- rbind.fill(final_data_matrix, huet)
 
 
@@ -1160,7 +1107,17 @@ for(i in 1:nrow(azizi_data)){
   }
 }
 
-azizi_data$DX_VAF = azizi_data$DX_VAF*100
+for(i in 1:nrow(azizi_data)){
+  if(!is.na(azizi_data$VAF[i])){
+    if(azizi_data$VAF[i] == "NP"){
+      azizi_data$VAF[i] = NA
+    } 
+  }
+}
+
+azizi_data$VAF = as.numeric(azizi_data$VAF)
+
+azizi_data$VAF = azizi_data$VAF*100
 
 azizi_data$Cohort = azizi_data$Cohort[azizi_data$Cohort == "Grief"] <- "Greif"
 
@@ -1223,7 +1180,7 @@ for(i in 1:nrow(final_data_matrix)){
 # remove CML patients
 final_data_matrix <- final_data_matrix[!grepl("CML", final_data_matrix$Subset),]
 
-# remove SBTB33 mutations because they are over-represented in the Majeti cohort
+# remove SBTB33 mutations because they are over-represented/only in in the Majeti cohort
 final_data_matrix = subset(final_data_matrix, final_data_matrix$symbol != "ZBTB33")
 
 # frequency of gene mutations
@@ -1367,6 +1324,14 @@ for(i in 1:nrow(final_data_matrix)){
   }
 }
 
+# for some reason, SRSF2 used to be SFRS2 and was not changed in any of the datasets except BeatAML. Find the old annotations and change them here:
+for(i in 1:nrow(final_data_matrix)){
+  if(final_data_matrix$Gene[i] == "SFRS2"){
+    final_data_matrix$Gene[i] <- "SRSF2"
+  }
+}
+
+
 # add a column for annotating the mutation category
 final_data_matrix$mutation_category <- NA
 
@@ -1404,7 +1369,7 @@ for(i in 1:nrow(final_data_matrix)){
 # dplyr::select final columns and save the data frame
 
 final_data_matrix =  final_data_matrix %>%
-  dplyr::select(Sample,Gene,VAF,variant_type,amino_acid_change,Subset,PatientId,specimenType,Cohort,Censor,Time_to_OS,Sex,Age,Cytogenetics,Risk,BM_blast_percent,PB_blast_percent,WBC,Hemoglobin,LDH,Platelet,PB_wbc_percent,mut_freq_gene,mut_freq_pt,mut_freq_bin,VAF_male_x,VAF_CN_corrected,mutation_category)
+  dplyr::select(Sample,Gene,VAF,variant_type,amino_acid_change,Subset,PatientId,specimenType,Cohort,Censor,Time_to_OS,Sex,Age,Cytogenetics,Risk,BM_blast_percent,PB_blast_percent,WBC,Hemoglobin,LDH,Platelet,PB_wbc_percent,mut_freq_gene,mut_freq_pt,mut_freq_bin,VAF_male_x,mutation_category, FAB)
 
 save(final_data_matrix,  file = "~/Desktop/MetaAML_results/final_data_matrix.RData")
 write.csv(final_data_matrix,  file = "~/Desktop/MetaAML_results/final_data_matrix.csv")
@@ -1566,7 +1531,7 @@ if (!require('plyr')) install.packages('plyr'); library('plyr')
 if (!require('dplyr')) install.packages('dplyr'); library('dplyr')
 if (!require('data.table')) install.packages('data.table'); library('data.table')
 if (!require('ggsci')) install.packages('ggsci'); library('ggsci')
-# if (!require('ComplexHeatmap')) install.packages('ComplexHeatmap'); library('ComplexHeatmap')
+if (!require('magick')) install.packages('magick'); library('magick')
 library(devtools)
 install_github("jokergoo/ComplexHeatmap")
 library(ComplexHeatmap)
@@ -1601,11 +1566,17 @@ subset_color = list("de_novo" = "#C16622FF",
 
 final_data_matrix_3 <- final_data_matrix
 
+for(i in 1:nrow(final_data_matrix_3)){
+  if(final_data_matrix_3$variant_type[i] == "other"){
+    final_data_matrix_3$variant_type[i] = "Unknown"
+  }
+}
+
 # plot only genes mutated at least 100 times in the cohort
 final_data_matrix_3 <- subset(final_data_matrix_3, final_data_matrix_3$mut_freq_gene >= 100)
 
-# c = as.numeric(n_distinct(final_data_matrix_3$Sample))
-c = 2865
+c = as.numeric(n_distinct(final_data_matrix_3$Sample, final_data_matrix_3$Cohort, final_data_matrix_3$Age, final_data_matrix_3$Sex, final_data_matrix_3$Risk, final_data_matrix_3$Subset, final_data_matrix_3$Time_to_OS))
+# c = 2865
 r = as.numeric(n_distinct(final_data_matrix_3$Gene))
 
 temp_dat <- data.frame(matrix(NA, nrow = r, ncol = c))
@@ -1636,6 +1607,7 @@ col = c(Deletion = "#374E55FF", INDEL = "#DF8F44FF", Insertion = "#00A1D5FF", IT
 
 
 anno_df <- unique(data.frame(final_data_matrix_3$Sample, final_data_matrix_3$Cohort, final_data_matrix_3$Age, final_data_matrix_3$Sex, final_data_matrix_3$Risk, final_data_matrix_3$Subset, final_data_matrix_3$Time_to_OS))
+
 colnames(anno_df) <- c("Sample", "Cohort", "Age", "Sex", "Risk", "Subset", "Survival")
 
 for(i in 1:nrow(anno_df)){
@@ -1729,3 +1701,234 @@ png(filename = "~/Desktop/MetaAML_results/Figure_1/cohort_oncoprint_100.png", re
 fig1B
 print(fig1B)
 dev.off()
+
+
+
+#### Supplimental ####
+if (!require('ggridges')) install.packages('ggridges'); library('ggridges')
+
+dir.create("~/Desktop/MetaAML_results/Figure_1/Supplimental")
+
+# data
+load("~/Desktop/MetaAML_results/final_data_matrix.RData")
+
+# establish uniform colors for each cohort
+cohort_colors = c("Tyner" = "#0073C2FF", 
+                  "TCGA" = '#EFC000FF', 
+                  "Majeti" = '#868686FF', 
+                  "Papaemmanuil" = "#CD534CFF", 
+                  "Lindsley" = '#7AA6DCFF', 
+                  "Wang" = '#E64B35FF',
+                  "Au" = '#4DBBD5FF',
+                  "Welch" = '#00A087FF',
+                  "Garg" = '#3C5488FF',
+                  "Greif" = "#F39B7FFF",
+                  "Li" = "#8491B4FF",
+                  "Shlush" = "#91D1C2FF",
+                  "Parkin" = "#DC0000FF", 
+                  "Hirsch" = "#7E6148FF", 
+                  "Huet" = "#B09C85FF")
+
+# Age ####
+sub=na.omit(as.data.frame(distinct(final_data_matrix, Sample, Age, Cohort)))
+sub$Age=as.numeric(sub$Age)
+
+ggplot(sub, aes(x = Age, y = as.factor(Cohort), fill = Cohort)) +
+  theme_cowplot() +
+  geom_density_ridges(
+    jittered_points = F, position = "raincloud",
+    alpha = 1, scale = 1,
+    quantile_lines = TRUE, quantiles = 2
+  ) +
+  scale_y_discrete(expand = c(0,0)) +
+  ylab(label = NULL) +
+  theme(legend.position = "none") +
+  scale_fill_manual(name = "", values = cohort_colors) +
+  theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust = 1))
+
+ggsave(filename = "~/Desktop/MetaAML_results/Figure_1/Supplimental/age_by_cohort.png", dpi = 300, width = 3, height = 4, units = "in")
+
+# Gender ####
+sub=na.omit(as.data.frame(distinct(final_data_matrix, Sample, Sex, Cohort)))
+
+sub = sub %>% group_by(Cohort, Sex) %>% tally()
+
+ggplot(sub, aes(fill=Sex, y=n, x=Cohort)) + 
+  geom_bar(position = "fill", stat="identity",) +
+  scale_fill_manual(values = c("Male" = "#6a51a3", "Female" = "#43a2ca")) +
+  scale_y_continuous(expand = c(0,0)) +
+  theme(axis.text.x = element_text(angle = 45, 
+                                   vjust = 1, 
+                                   hjust = 1)) +
+  ylab(label = NULL) +
+  xlab(label = NULL)  +
+  theme_cowplot() +
+  theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust = 1))
+
+ggsave(filename = "~/Desktop/MetaAML_results/Figure_1/Supplimental/sex_by_cohort.png", dpi = 300, width = 5, height = 3, units = "in")
+
+# Risk ####
+sub=na.omit(as.data.frame(distinct(final_data_matrix, Sample, Risk, Cohort)))
+
+sub = sub %>% group_by(Cohort, Risk) %>% tally()
+
+ggplot(sub, aes(fill=Risk, y=n, x=Cohort)) + 
+  geom_bar(position = "fill", stat="identity",) +
+  scale_fill_manual(values = c("Adverse" = "#E64B35FF",
+                               "Intermediate" = "#8491B4FF",
+                               "Favorable" = "#00A087FF", 
+                               "Unknown" = "#767676FF")) +
+  scale_y_continuous(expand = c(0,0)) +
+  theme(axis.text.x = element_text(angle = 45, 
+                                   vjust = 1, 
+                                   # size = 12, 
+                                   hjust = 1)) +
+  ylab(label = NULL) +
+  xlab(label = NULL)  +
+  theme_cowplot() +
+  theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust = 1))
+
+ggsave(filename = "~/Desktop/MetaAML_results/Figure_1/Supplimental/risk_by_cohort.png", dpi = 300, width = 5, height = 3, units = "in")
+
+
+# Survival ####
+sub = na.omit(as.data.frame(distinct(final_data_matrix, Sample, Cohort, Time_to_OS, Censor)))
+sub$Cohort = as.factor(sub$Cohort)
+
+# all
+sub$Time_to_OS <- (sub$Time_to_OS/365)
+sub$OS <- with(sub, Surv(Time_to_OS, Censor == 1))
+OS <- survfit(OS ~ Cohort, data = sub, conf.type = "log-log")
+
+surv_plot <- ggsurvplot(OS,
+                        data = sub,
+                        log = (OS),
+                        log.rank.weights = c("survdiff"),
+                        pval = F,
+                        test.for.trend = F,
+                        pval.method.size = 3,
+                        pval.coord = c(0, 0),
+                        conf.int = F,
+                        censor = T,
+                        surv.median.line = "none",
+                        risk.table = F,
+                        risk.table.title = "",
+                        risk.table.fontsize = 4,
+                        risk.table.height = .3,
+                        risk.table.y.text = T,
+                        break.time.by = 5,
+                        risk.table.pos = c("out"),
+                        palette = cohort_colors,
+                        xlab = "Years",
+                        ylim = c(0, 1.0),
+                        ylab =  "Survival Probability",
+                        font.main = c(15, "plain", "#252525"),
+                        pval.size = 4,
+                        font.x = c(12, "plain", "#252525"),
+                        font.y =  c(12, "plain", "#252525"),
+                        font.legend = c(12, "plain"),
+                        font.tickslab = c(12, "plain", "#252525"),
+                        legend.labs = c("Garg", "Hirsch", "Huet", "Lindsley", "Majeti", "Papaemmanuil", "TCGA", "Tyner", "Welch"),
+                        legend.title = "Cohort",
+                        legend = "right",
+                        ggtheme = theme_cowplot())
+# ggtheme = theme(plot.title = element_text(hjust = 0.5)))
+
+print(surv_plot)
+png(filename = "~/Desktop/MetaAML_results/Figure_1/Supplimental/total_survival.png", res = 300, width = 5, height = 3, units = "in")
+
+surv_plot
+print(surv_plot)
+dev.off()
+
+# de novo
+sub = na.omit(as.data.frame(distinct(final_data_matrix, Sample, Cohort, Time_to_OS, Censor, Subset)))
+
+sub = subset(sub, Subset == "de_novo")
+
+sub$Time_to_OS <- (sub$Time_to_OS/365)
+sub$OS <- with(sub, Surv(Time_to_OS, Censor == 1))
+OS <- survfit(OS ~ Cohort, data = sub, conf.type = "log-log")
+
+surv_plot <- ggsurvplot(OS,
+                        data = sub,
+                        log = (OS),
+                        log.rank.weights = c("survdiff"),
+                        pval = F,
+                        test.for.trend = F,
+                        pval.method.size = 3,
+                        pval.coord = c(0, 0),
+                        conf.int = F,
+                        censor = T,
+                        surv.median.line = "none",
+                        risk.table = F,
+                        risk.table.title = "",
+                        risk.table.fontsize = 4,
+                        risk.table.height = .3,
+                        risk.table.y.text = T,
+                        break.time.by = 5,
+                        risk.table.pos = c("out"),
+                        palette = cohort_colors,
+                        xlab = "Years",
+                        ylim = c(0, 1.0),
+                        ylab =  "Survival Probability",
+                        font.main = c(15, "plain", "#252525"),
+                        pval.size = 4,
+                        font.x = c(12, "plain", "#252525"),
+                        font.y =  c(12, "plain", "#252525"),
+                        font.legend = c(12, "plain"),
+                        font.tickslab = c(12, "plain", "#252525"),
+                        legend.labs = c("Garg", "Hirsch", "Huet", "Majeti", "Papaemmanuil", "TCGA", "Tyner", "Welch"),
+                        legend.title = "Cohort",
+                        legend = "none",
+                        ggtheme = theme_cowplot())
+# ggtheme = theme(plot.title = element_text(hjust = 0.5)))
+
+print(surv_plot)
+png(filename = "~/Desktop/MetaAML_results/Figure_1/Supplimental/de_novo_survival.png", res = 300, width = 4, height = 4, units = "in")
+
+surv_plot
+print(surv_plot)
+dev.off()
+
+
+# VAF per cohort ####
+sub = na.omit(as.data.frame(distinct(final_data_matrix, Sample, Gene, VAF, Cohort, Subset)))
+
+ggplot(sub, aes(x = VAF, y = as.factor(Cohort), fill = Cohort)) +
+  theme_cowplot() +
+  geom_density_ridges(
+    jittered_points = F, 
+    position = "raincloud",
+    alpha = 1, scale = 1,
+    quantile_lines = TRUE, quantiles = 2
+  ) +
+  scale_y_discrete(expand = c(0,0)) +
+  ylab(label = NULL) +
+  theme(legend.position = "none") +
+  scale_fill_manual(name = "", values = cohort_colors) +
+  theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust = 1))
+
+ggsave(filename = "~/Desktop/MetaAML_results/Figure_1/Supplimental/vaf_by_cohort.png", dpi = 300, width = 3, height = 4, units = "in")
+
+
+
+# VAF per gene ####
+sub <- subset(final_data_matrix, final_data_matrix$mut_freq_gene >= 100)
+sub = na.omit(as.data.frame(distinct(sub, Sample, Gene, VAF, Cohort, Subset)))
+
+ggplot(sub, aes(x = VAF, y = reorder(Gene, desc(Gene)))) +
+  geom_density_ridges(
+    jittered_points = F, 
+    position = "raincloud",
+    alpha = 1, scale = 1,
+    quantile_lines = TRUE, quantiles = 2
+  ) +
+  scale_y_discrete(expand = c(0,0)) +
+  xlim(0,100) +
+  ylab(label = NULL) +
+  theme(legend.position = "none") +
+  theme_cowplot() +
+  theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust = 1))
+
+ggsave(filename = "~/Desktop/MetaAML_results/Figure_1/Supplimental/vaf_by_gene.png", dpi = 300, width = 3, height = 4, units = "in")

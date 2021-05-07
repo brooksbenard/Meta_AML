@@ -1,12 +1,11 @@
 # ========================================================================================================================================== #
 # Figure_3.R
 # Author : Brooks Benard, bbenard@stanford.edu
-# Date: 09/03/2020
+# Date: 03/16/2021
 # Description: This script will perform survival analyses based on VAF thresholds as seen in Figure 3 of the manuscript Benard et al. "Clonal architecture and variant allele frequency correlate with clinical outcomes and drug response in acute myeloid leukemia".
 # ========================================================================================================================================== #
 
 # libraries
-if (!require('shiny')) install.packages('shiny'); library('shiny')
 if (!require('scales')) install.packages('scales'); library('scales')
 if (!require('ggplot2')) install.packages('ggplot2'); library('ggplot2')
 if (!require('readxl')) install.packages('readxl'); library('readxl')
@@ -31,164 +30,11 @@ if (!require('maxstat')) install.packages('maxstat'); library('maxstat')
 if (!require('rstatix')) install.packages('rstatix'); library('rstatix')
 if (!require('psych')) install.packages('psych'); library('psych')
 
-library(maxstat)
-
 dir.create("~/Desktop/MetaAML_results/Figure_3")
 dir.create("~/Desktop/MetaAML_results/Figure_3/Supplimental")
 
-# VAf distribution ####
-load("~/Desktop/MetaAML_results/final_data_matrix.RData")
-
-vaf_sub = subset(final_data_matrix, final_data_matrix$Subset == "de_novo")
-vaf_sub = subset(vaf_sub, vaf_sub$mut_freq_gene >= 50)
-vaf_sub = subset(vaf_sub, vaf_sub$Gene != "MLL")
-
-# make sure that the FLT3 symbols are annotated properly
-for(i in 1:nrow(vaf_sub)){
-  if(vaf_sub$Gene[i] == "FLT3" & vaf_sub$variant_type[i] == "ITD"){
-    vaf_sub$Gene[i] <- "FLT3-ITD"
-  }
-  if(vaf_sub$Gene[i] == "FLT3" & vaf_sub$variant_type[i] == "SNV"){
-    vaf_sub$Gene[i] <- "FLT3-TKD"
-  }
-  if(vaf_sub$Gene[i] == "FLT3" & vaf_sub$variant_type[i] == "Deletion"){
-    vaf_sub$Gene[i] <- "FLT3-TKD"
-  }
-  if(vaf_sub$Gene[i] == "FLT3" & vaf_sub$variant_type[i] == "INDEL"){
-    vaf_sub$Gene[i] <- "FLT3-ITD"
-  }
-}
-
-vaf_sub = select(vaf_sub, Sample, Gene, VAF_male_x, variant_type)
-
-vaf_sub$threshold = ifelse(vaf_sub$VAF_male_x >= .3 , "High", "Low")
-
-vaf_sub = subset(vaf_sub, vaf_sub$threshold == "High" | vaf_sub$threshold == "Low")
-
-vaf_sub$VAF_male_x=as.numeric(vaf_sub$VAF_male_x)
-vaf_sub$Gene = as.character(vaf_sub$Gene)
-
-vaf_sub$Gene <- with(vaf_sub, reorder(Gene, -VAF_male_x, median))
-
-
-p = ggplot(vaf_sub, aes(x=Gene, y=VAF_male_x)) + 
-  geom_boxplot(notch=F, outlier.colour = "white", color = "#374E55FF", fill = "lightgrey") +
-  geom_jitter(aes(fill = threshold), color = "black", shape = 21, position=position_jitter(0.2), size = 1.5) +
-  scale_fill_manual(values = c("#cb181d", "#3690c0")) +
-  # scale_fill_manual(values = c(Deletion = "#374E55FF", INDEL = "#DF8F44FF", Insertion = "#00A1D5FF", ITD = "#79AF97FF", SNV = "#B24745FF", Splicing = "#6A6599FF", Unknown = "#80796BFF")) +
-  geom_hline(yintercept = .3, color = "#b2182b", linetype="dashed") +
-  theme_cowplot(font_size = 7.5) +
-  labs(title = NULL) +
-  ylab(label = "VAF") +
-  xlab(label = NULL) +
-  theme(legend.position="right") +
-  theme(axis.text.x = element_text(angle = 45, vjust = 1, 
-                                   size = 7.5, hjust = 1),
-        axis.text.y = element_text(size = 7.5))
-
-ggpar(p, legend.title = "")
-ggsave(filename = "~/Desktop/MetaAML_results/Figure_3/MetaAML_vaf_distribution.pdf", dpi = 300, width = 10, height = 3, units = "in")
-
-
-# now plot the VAF distributino per gene colored by whethere the mutation is above or below the mdeian VAF for that gene
-genes = unique(vaf_sub$Gene)
-
-vaf_sub$median_threshold = NA
-
-threshold_list = list()
-z = 1
-
-for(i in 1:length(genes)){
-  # print(i)
-  # select the gene of interest
-  sub = subset(vaf_sub, Gene == genes[i])
-  
-  # calculate the median vaf based on the X-corrected VAF
-  med_vaf = as.numeric(median(sub$VAF_male_x))
-  
-  sub$median_threshold = ifelse(sub$VAF_male_x >= med_vaf, "High", "Low")
-  
-  threshold_list[[i]] = data.frame(sub)
-  
-  # z = z + 1
-}
-
-threshold_list_all = do.call(rbind, threshold_list)
-rm(threshold_list)
-
-threshold_list_all$Gene <- with(threshold_list_all, reorder(Gene, -VAF_male_x, median))
-
-p = ggplot(threshold_list_all, aes(x=Gene, y=VAF_male_x)) + 
-  geom_boxplot(notch=F, outlier.colour = "white", color = "#374E55FF", fill = "lightgrey") +
-  geom_jitter(aes(fill = median_threshold), color = "black", shape = 21, position=position_jitter(0.2), size = 1.5) +
-  scale_fill_manual(values = c("#cb181d", "#3690c0")) +
-  # scale_fill_manual(values = c(Deletion = "#374E55FF", INDEL = "#DF8F44FF", Insertion = "#00A1D5FF", ITD = "#79AF97FF", SNV = "#B24745FF", Splicing = "#6A6599FF", Unknown = "#80796BFF")) +
-  # geom_point(data=hline, aes(tt, v), shape=95, size=5) +
-  # geom_hline(yintercept = hline, color = "#b2182b", linetype="dashed") +
-  theme_cowplot(font_size = 7.5) +
-  labs(title = NULL) +
-  ylab(label = "VAF") +
-  xlab(label = NULL) +
-  theme(legend.position="right", legend.text = element_text(size = 7.5), axis.text.x = element_text(angle = 45, vjust = 1, 
-                                   size = 7.5, hjust = 1),
-        axis.text.y = element_text(size = 7.5))
-
-ggpar(p, legend.title = "")
-ggsave(filename = "~/Desktop/MetaAML_results/Figure_3/MetaAML_vaf_distribution_median.pdf", dpi = 300, width = 10, height = 2.5, units = "in")
-
-
-# alternate visualization using Rainplot
-if (!require(remotes)) {
-  install.packages("remotes")
-}
-remotes::install_github('jorvlan/raincloudplots')
-
-library(raincloudplots)
-
-packages <- c("ggplot2", "dplyr", "lavaan", "plyr", "cowplot", "rmarkdown", 
-              "readr", "caTools", "bitops")
-if (length(setdiff(packages, rownames(installed.packages()))) > 0) {
-  install.packages(setdiff(packages, rownames(installed.packages())))  
-}
-
-p=ggplot(threshold_list_all, aes(x = Gene, y = VAF_male_x, fill = median_threshold)) +
-  geom_flat_violin(aes(fill = "darkgrey"),position = position_nudge(x = .1, y = 0), adjust = 1.5, trim = FALSE, alpha = .5, colour = "black")+
-  geom_boxplot(aes(x = Gene, y = VAF_male_x, fill = "darkgrey"),outlier.shape = NA, alpha = .5, width = .25, colour = "black")+
-  geom_point(aes(x = as.numeric(Gene)-.15, y = VAF_male_x, colour = median_threshold),position = position_jitter(width = .025), size = 1.5, shape = 21, color = "black")+
-  # scale_colour_brewer(palette = "Dark2")+
-  # scale_fill_brewer(palette = "Dark2")+
-  scale_color_manual(values = c("darkgrey", "#cb181d", "#3690c0")) +
-  scale_fill_manual(values = c( "darkgrey", "#cb181d", "#3690c0")) +
-  theme_cowplot(font_size = 7.5) +
-  ylim(0,1) +
-  ggtitle("") +
-  ylab("VAF") +
-  xlab("") +
-  theme(axis.text.y = element_text(size = 7.5)) +
-  theme(axis.text.x = element_text(angle = 45, vjust = 1, 
-                                   size = 7.5, hjust = 1))
-ggpar(p, legend.title = "")
-ggsave(filename = "~/Desktop/MetaAML_results/Figure_3/MetaAML_vaf_distribution_median_detailed.pdf", dpi = 300, width = 10, height = 2.5, units = "in")
-
-
-ggplot(threshold_list_all, aes(x = Gene, y = VAF_male_x, fill = median_threshold)) +
-  # geom_flat_violin(position = position_nudge(x = .1, y = 0), adjust = 1.5, trim = FALSE, alpha = .5, colour = "grey")+
-  geom_jitter(aes(fill = median_threshold), color = "black", shape = 21, position=position_jitter(0.2), size = 1.5) +
-  geom_boxplot(aes(x = Gene, y = VAF_male_x),outlier.shape = NA, alpha = .5, width = .1, colour = "black")+
-  scale_fill_manual(values = c("#cb181d", "#3690c0")) +
-  theme_cowplot() +
-  ggtitle("") +
-  ylab("") +
-  ylim(0,1) +
-  theme(axis.text.x = element_text(angle = 45, vjust = 1, 
-                                   size = 10, hjust = 1))
-
-
-
-
 #### CNA correction ####
-# Using the cytogenetic data, recalculate the VAF for mutations falling on focal or general CNAs
-
+# Using the cytogenetic data, recalculate the VAF for mutations falling on focal or broad CNAs
 # Pappamanuel/Gerstung VAF correction is performed using code provided by the authors
 # TCGA VAFs are corrected using a gene-level CNA supplimentary file
 # for all other cohorts, manual correction is performed using reported cytogenetic/karyotypic data. 
@@ -209,19 +55,16 @@ dim(mutationTable)
 
 all(rownames(mutationTable)==clinicalData$PDID)
 
-
 # 1.3.4 Covariates
 dataList <-list(Genetics = data.frame(mutationTable[,colSums(mutationTable)>0]),
                 Cytogenetics = clinicalData[,grep("^(t_)|(inv)|(abn)|(plus)|(minus)|(mono)|(complex)",colnames(clinicalData))],
                 Nuisance = data.frame( as.integer(clinicalData$Study), 
                                        Date=scale(as.numeric(clinicalData$ERDate), scale=FALSE), 
                                        MissingCyto=is.na(clinicalData$t_15_17)+0),
-                Treatment = data.frame(ATRA = clinicalData$ATRA_arm, VPA=clinicalData$VPA, TPL_os=tplIndexOs), 
                 Demographics = clinicalData[,c("AOD","gender")],
                 Clinical = cbind(clinicalData[, c("Performance_ECOG","BM_Blasts","PB_Blasts","wbc","LDH","HB","platelet",
                                                   "Splenomegaly")], as.integer(clinicalData$TypeAML)),
                 MolRisk = as.integer(clinicalData$M_Risk))
-#
 dataList$Genetics$CEBPA <- clinicalData$CEBPA # encoded as 0,1,2 
 dataList$Genetics$CEBPA_mono <- clinicalData$CEBPA == 1 # encoded as 0,1,2 
 dataList$Genetics$CEBPA_bi <- clinicalData$CEBPA == 2 # encoded as 0,1,2 
@@ -240,10 +83,9 @@ dataList$Genetics = dataList$Genetics + 0
 # Condensing to a data.frame
 dataRaw <- do.call(cbind,dataList)
 names(dataRaw) <- unlist(sapply(dataList, names)) 
-dataRaw = dataFrame
+dataFrame = dataRaw
 dim(dataFrame)
 rownames(dataFrame) <- clinicalData$PDID
-
 
 download.file("https://github.com/gerstung-lab/AML-multistage/raw/master/data/AMLSG_Karyotypes.txt", destfile = "~/Desktop/MetaAML_results/raw_data/AMLSG_Karyotypes.txt")
 
@@ -251,7 +93,6 @@ download.file("https://github.com/gerstung-lab/AML-multistage/raw/master/data/AM
 copyNumbers = cbind(dataList$Cytogenetics[grep(c("minus|plus|mono"), colnames(dataList$Cytogenetics))], clinicalData$gender)
 copyNumbers$minus7 <- (copyNumbers$minus7 | copyNumbers$minus7q) + 0
 copyNumbers$minus7q <- NULL
-
 
 for(i in 1:ncol(copyNumbers)){
   if(grepl("plus", colnames(copyNumbers)[i])){
@@ -325,35 +166,6 @@ load("~/Desktop/MetaAML_results/final_data_matrix.RData")
 papaemmanuil_sub = subset(final_data_matrix, final_data_matrix$Cohort == "Papaemmanuil")
 papaemmanuil_corrected = left_join(papaemmanuil_sub, papaemmanuil_muts, by=c("Sample","Gene", "VAF"))
 
-# plot the difference in VAF distribution per gene after CNA correction
-raw_vaf = select(papaemmanuil_corrected, Gene, VAF)
-raw_vaf$group = "VAF"
-
-CNA_vaf = select(papaemmanuil_corrected, Gene, VAF_CN_corrected)
-names(CNA_vaf)[2] = "VAF"
-CNA_vaf$group = "VAF + \nCytogenetics"
-
-all = rbind(raw_vaf, CNA_vaf)
-
-# select mutations
-mut_list = c("TP53", "DNMT3A", "SRSF2", "IDH2", "JAK2", "TET2", "U2AF1", "IDH1", "ETV6", "RUNX1", "BCOR", "ASXL1", "PHF6", "SF3B1", "GATA2", "CBL", "CEBPA", "WT1", "RAD21", "EZH2", "NF1", "KIT", "NPM1", "FLT3-ITD","NRAS", "KRAS", "FLT3-TKD", "PTPN11")
-
-all = subset(all, all$Gene %in% mut_list)
-
-all$group <- factor(all$group , levels=c("VAF", "VAF + \nCytogenetics"))
-
-p <- ggboxplot(all, x = "Gene", y = "VAF",
-               color = "group", palette = "jama",
-               add = "jitter",
-               shape = 20)
-p + stat_compare_means(aes(group = group), label = "p.signif") + xlab(NULL) +
-  ylim(0,105) +
-  theme(legend.position="right", axis.text.x = element_text(angle = 45, vjust = 1,hjust = 1)) + theme(legend.title=element_blank())
-
-
-
-
-
 
 #### TCGA ####
 load("~/Desktop/MetaAML_results/final_data_matrix.RData")
@@ -405,33 +217,6 @@ for(i in 1:nrow(tcga_dat)){
 for(i in 1:nrow(tcga_dat)){
   if(is.na(tcga_dat$VAF_CN_corrected[i])) { tcga_dat$VAF_CN_corrected[i] = tcga_dat$VAF[i]}
 }
-
-raw_vaf = select(tcga_dat, Gene, VAF)
-raw_vaf$group = "VAF"
-
-CNA_vaf = select(tcga_dat, Gene, VAF_CN_corrected)
-names(CNA_vaf)[2] = "VAF"
-CNA_vaf$group = "VAF + \nCytogenetics"
-
-all = rbind(raw_vaf, CNA_vaf)
-
-
-# select mutations
-mut_list = c("TP53", "DNMT3A", "SRSF2", "IDH2", "JAK2", "TET2", "U2AF1", "IDH1", "ETV6", "RUNX1", "BCOR", "ASXL1", "PHF6", "SF3B1", "GATA2", "CBL", "CEBPA", "WT1", "RAD21", "EZH2", "NF1", "KIT", "NPM1", "FLT3-ITD","NRAS", "KRAS", "FLT3-TKD", "PTPN11")
-
-all = subset(all, all$Gene %in% mut_list)
-
-all$group <- factor(all$group , levels=c("VAF", "VAF + \nCytogenetics"))
-
-p <- ggboxplot(all, x = "Gene", y = "VAF",
-               color = "group", palette = "jama",
-               add = "jitter",
-               shape = 20)
-p + stat_compare_means(aes(group = group), label = "p.signif") + xlab(NULL) +
-  ylim(0,105) +
-  theme(legend.position="right", axis.text.x = element_text(angle = 45, vjust = 1,hjust = 1)) + theme(legend.title=element_blank())
-
-
 
 
 #### Other cohorts ####
@@ -488,15 +273,27 @@ for(i in 1:nrow(cohort_aggrigate)){
   locus_loss = paste("del",cohort_aggrigate$partial_annotation[i],"|","del",cohort_aggrigate$full_annotation[i], sep = "")
   
   # correct for VAF based on broad copy number gains at the gene locus  
-  if(grepl(locus_gain, cohort_aggrigate$Cytogenetics[i]) & cohort_aggrigate$VAF[i] > 35){ cohort_aggrigate$VAF_CN_corrected[i] = cohort_aggrigate$VAF[i]*0.75}
-  if(grepl(locus_gain, cohort_aggrigate$Cytogenetics[i]) & cohort_aggrigate$VAF[i] <= 35){ cohort_aggrigate$VAF_CN_corrected[i] = cohort_aggrigate$VAF[i]*1.5}
+  if(grepl(locus_gain, cohort_aggrigate$Cytogenetics[i], fixed = T) & cohort_aggrigate$VAF[i] > 35){ cohort_aggrigate$VAF_CN_corrected[i] = cohort_aggrigate$VAF[i]*0.75}
+  if(grepl(locus_gain, cohort_aggrigate$Cytogenetics[i], fixed = T) & cohort_aggrigate$VAF[i] <= 35){ cohort_aggrigate$VAF_CN_corrected[i] = cohort_aggrigate$VAF[i]*1.5}
   # correct for VAF based on broad copy number loss at the gene locus
-  if(grepl(locus_loss, cohort_aggrigate$Cytogenetics[i])){ cohort_aggrigate$VAF_CN_corrected[i] = cohort_aggrigate$VAF[i]/2}
+  if(grepl(locus_loss, cohort_aggrigate$Cytogenetics[i], fixed = T)){ cohort_aggrigate$VAF_CN_corrected[i] = cohort_aggrigate$VAF[i]/2}
 
 }
+
+# TP53 is a unique case. Code manually for focal deletions
+tp53_loss1 = "del(17)(p13)"
+tp53_loss2 = "del(17)(p11.2p13)"
+
 for(i in 1:nrow(cohort_aggrigate)){
-  print(i)
-  if(is.na(cohort_aggrigate$VAF_CN_corrected[i])) { cohort_aggrigate$VAF_CN_corrected[i] = cohort_aggrigate$VAF[i]}
+  # if no copy number differenes detected, populate the raw VAF
+  if(grepl(tp53_loss1, cohort_aggrigate$Cytogenetics[i]) & cohort_aggrigate$Gene[i] == "TP53") { cohort_aggrigate$VAF_CN_corrected[i] = cohort_aggrigate$VAF[i]/2}
+  
+  if(grepl(tp53_loss2, cohort_aggrigate$Cytogenetics[i], fixed = T) & cohort_aggrigate$Gene[i] == "TP53") { cohort_aggrigate$VAF_CN_corrected[i] = cohort_aggrigate$VAF[i]/2}
+  
+}
+
+for(i in 1:nrow(cohort_aggrigate)){
+  if(is.na(cohort_aggrigate$VAF_CN_corrected[i])) { cohort_aggrigate$VAF_CN_corrected[i] = cohort_aggrigate$VAF_male_x[i]}
 }
 
 # bind all of the cohorts together into a final data frame
@@ -506,15 +303,15 @@ cohort_aggrigate[,28:32] = NULL
 
 # bind all cohorts together
 final_data_matrix = rbind(papaemmanuil_corrected, tcga_dat, cohort_aggrigate)
-final_data_matrix_2 = final_data_matrix
-save(final_data_matrix,  file = "~/Desktop/MetaAML_results/final_data_matrix_2.RData")
+final_data_matrix_2 = subset(final_data_matrix, final_data_matrix$Subset == "de_novo" & final_data_matrix$VAF_CN_corrected > 0)
+save(final_data_matrix_2,  file = "~/Desktop/MetaAML_results/final_data_matrix_2.RData")
 
 
 # plot the difference in VAF distribution per gene after CNA correction
-raw_vaf = select(final_data_matrix, Gene, VAF, Cohort)
+raw_vaf = select(final_data_matrix_2, Gene, VAF, Cohort)
 raw_vaf$group = "VAF"
 
-CNA_vaf = select(final_data_matrix, Gene, VAF_CN_corrected, Cohort)
+CNA_vaf = select(final_data_matrix_2, Gene, VAF_CN_corrected, Cohort)
 names(CNA_vaf)[2] = "VAF"
 CNA_vaf$group = "VAF + \nCytogenetics"
 
@@ -525,7 +322,9 @@ mut_list = c("TP53", "DNMT3A", "SRSF2", "IDH2", "JAK2", "TET2", "U2AF1", "IDH1",
 
 all = subset(all, all$Gene %in% mut_list)
 
-all$group <- factor(all$group , levels=c("VAF", "VAF + \nCytogenetics"))
+all$group = factor(all$group , levels=c("VAF", "VAF + \nCytogenetics"))
+
+genes = sort(unique(all$Gene))
 
 # Box plot facetted by "gene"
 p <- ggpaired(all, x = "group", y = "VAF",
@@ -534,48 +333,32 @@ p <- ggpaired(all, x = "group", y = "VAF",
               facet.by = "Gene", short.panel.labs = T)
 # Use only p.format as label. Remove method name.
 p + stat_compare_means(label = "p.format", paired = TRUE) + xlab(NULL) + ylab("VAF") + theme(legend.title=element_blank())
-ggsave(filename = "~/Desktop/MetaAML_results/Figure_3/Supplimental/all_vaf_correction_comparison_facet.pdf", dpi = 300, width = 10, height = 12, units = "in")
-
-# subset to only those with VAF data and plot distributions by cohort
-all = subset(all, all$Cohort %in% c("Papaemmanuil", "TCGA", "Tyner", "Majeti", "Welch", "Greif", "Hirsch"))
-
-p <- ggboxplot(all, x = "Gene", y = "VAF",
-               color = "group", palette = "jama",
-               add = "jitter",
-               # shape = "Cohort",
-               facet.by = "Cohort",
-               shape = 20)
-p + stat_compare_means(aes(group = group), label = "p.signif") + xlab(NULL) +
-  ylim(0,105) +
-  theme(legend.position="right", axis.text.x = element_text(angle = 45, vjust = 1,hjust = 1)) + theme(legend.title=element_blank())
-
-ggsave(filename = "~/Desktop/MetaAML_results/Figure_3/Supplimental/all_vaf_correction_comparison_facet.pdf", dpi = 300, width = 20, height = 10, units = "in")
+ggsave(filename = "~/Desktop/MetaAML_results/Figure_3/Supplimental/all_vaf_correction_comparison_facet_gene.pdf", dpi = 300, width = 10, height = 12, units = "in")
 
 # plot total vaf distribution for recurrent mutations
 p <- ggboxplot(all, x = "Gene", y = "VAF",
                color = "group", palette = "jama",
                add = "jitter",
-               # shape = "Cohort",
-               # facet.by = "Cohort",
-               shape = 20)
-p + stat_compare_means(aes(group = group), label = "p.signif") + xlab(NULL) +
-  ylim(0,105) +
+               order = genes, 
+               shape = 21)
+p + stat_compare_means(aes(group = group), label = "p.signif", hide.ns = TRUE) + xlab(NULL) +
+  ylim(0,110) +
   theme(legend.position="right", axis.text.x = element_text(angle = 45, vjust = 1,hjust = 1)) + theme(legend.title=element_blank())
 
-ggsave(filename = "~/Desktop/MetaAML_results/Figure_3/Supplimental/all_vaf_correction_comparison.pdf", dpi = 300, width = 15, height = 5, units = "in")
+ggsave(filename = "~/Desktop/MetaAML_results/Figure_3/Supplimental/all_vaf_correction_comparison.pdf", dpi = 300, width = 15, height = 3, units = "in")
 
 
 # now plot the VAF distribution per gene colored by if the mutation is above or below the median VAF for that gene
-genes = unique(final_data_matrix$Gene)
+genes = unique(final_data_matrix_2$Gene)
 
-final_data_matrix$median_threshold = NA
+final_data_matrix_2$median_threshold = NA
 
 threshold_list = list()
 z = 1
 
 for(i in 1:length(genes)){
   # select the gene of interest
-  sub = subset(final_data_matrix, Gene == genes[i])
+  sub = subset(final_data_matrix_2, Gene == genes[i])
   # calculate the median vaf based on the X-corrected VAF
   med_vaf = as.numeric(median(sub$VAF_CN_corrected, na.rm = T))
   
@@ -598,17 +381,14 @@ threshold_list_all = subset(threshold_list_all, threshold_list_all$Gene %in% mut
 threshold_list_all$Gene <- with(threshold_list_all, reorder(Gene, -VAF_CN_corrected, median))
 
 p = ggplot(threshold_list_all, aes(x=Gene, y=VAF_CN_corrected)) + 
+  theme_cowplot(font_size = 10) +
   geom_boxplot(notch=F, outlier.colour = "white", color = "#374E55FF", fill = "lightgrey") +
-  geom_jitter(aes(fill = median_threshold_NA), color = "black", shape = 21, position=position_jitter(0.2), size = 1.5) +
+  geom_jitter(aes(fill = median_threshold_NA), color = "black", shape = 21, position=position_jitter(0.15), size = 1.25) +
   scale_fill_manual(values = c("#cb181d", "#3690c0")) +
-  theme_cowplot(font_size = 7.5) +
   labs(title = NULL) +
   ylab(label = "VAF") +
   xlab(label = NULL) +
-  # theme(legend.position="right") +
-  theme(legend.position="right", legend.text = element_text(size = 7.5), axis.text.x = element_text(angle = 45, vjust = 1, 
-                                                                                                    size = 7.5, hjust = 1),
-        axis.text.y = element_text(size = 7.5))
+  theme(legend.position="right", axis.text.x = element_text(angle = 45, vjust = 1, hjust = 1))
 
 ggpar(p, legend.title = "")
 ggsave(filename = "~/Desktop/MetaAML_results/Figure_3/MetaAML_vaf_distribution_median_corrected.pdf", dpi = 300, width = 10, height = 2.5, units = "in")
@@ -738,7 +518,7 @@ for(i in 1:ncol(variables)){
         theme_cowplot(font_size = 20) +
         # labs(title = paste(gene)) +
         theme(plot.title = element_text(hjust = 0.5)) +
-        ylab(label= var_feature) +
+        ylab(label= variable) +
         xlab(label = NULL) +
         ylim(0,y_max) +
         theme(legend.position="right")  + labs(fill = "Median VAF") + theme(
@@ -750,6 +530,38 @@ for(i in 1:ncol(variables)){
                                           size=1.5, linetype="solid"))
   #
   ggsave(filename = paste("~/Desktop/MetaAML_results/Data/Figures/", "VAF_", variable,"/",variable,"_discrete.png", sep = ""), dpi = 300, width = 15, height = 15, units = "in")
+  
+  
+  # continuous
+  ggscatter(sub, "VAF", y = "Variable",
+            color = "black", fill = point_color, size = 5, shape = 21,
+            font.label = list(color = "black", size = 9, vjust = 0.5),
+            # title = paste(gene),
+            xlab = "VAF",
+            ylab = y_label) +
+    # xlim(0,1) +
+    # ylim(0,y_max)+
+    geom_smooth(method = "lm", color = "black", alpha = .5) +
+    theme(plot.title = element_text(hjust = 0.5, size = 18), axis.title = element_text(size = 18)) +
+    stat_cor(
+      aes(label = paste(..rr.label..)),
+      label.x.npc = 0.65,
+      label.y.npc = 1
+    ) +
+    stat_cor(
+      aes(label = paste(..p.label..)),
+      label.x.npc = 0.65,
+      label.y.npc = 0.9
+    ) +
+    # geom_text()
+    annotate("text", label = paste("n =", n), x = 0.75, y = n_label, size = 4, colour = "black")
+  
+  # p + facet_wrap(. ~ Gene, ncol = 6) +
+  #   theme(strip.background = element_rect(colour="black", fill="white", 
+  #                                         size=1.5, linetype="solid"))
+  
+  # ggsave(filename = paste("~/Desktop/MetaAML_results/Data/Figures/", "VAF_", variable,"/",variable,".png", sep = ""), dpi = 300, width = 15, height = 15, units = "in") 
+  
   
   
   for(j in 1:nrow(genes)){
@@ -879,12 +691,10 @@ for(i in 1:nrow(var2_adj_list)){
 var2_adj_list$Variable = factor(var2_adj_list$Variable, levels=c('WBC','Hemoglobin','Platelet','LDH', 'BM_blast_percent', 'PB_blast_percent', 'Age'))
 
 # plot the discrete results
-p = ggplot(var2_adj_list, aes(x = Mutated_Gene, y = effect_size, label = var2_adj_list$p_value)) +
+p = ggplot(var2_adj_list, aes(x = Mutated_Gene, y = effect_size, label = p_value)) +
   geom_hline(yintercept=0, linetype = "dashed", color = "black") +
   theme_cowplot() +
-  # geom_text(aes(Mutated_Gene, var2_adj_list$CI_upper), hjust = 0, nudge_y = 0.1) +
   geom_pointrange(size = 0.75, stat = "identity", 
-                  # shape = 21, fill = "white",
                   aes(x = Mutated_Gene, ymin = CI_lower, ymax = CI_upper, y = effect_size, color = sig)) +
   scale_color_manual(values = c("q < 0.2" = "#FDE725FF", "q < 0.1" = "#1F968BFF", "q < 0.05" = "#482677FF", "q > 0.2" = "grey")) +
   ylab("Effect Size (high VAF vs. low VAF)")+
@@ -894,17 +704,36 @@ p = ggplot(var2_adj_list, aes(x = Mutated_Gene, y = effect_size, label = var2_ad
   coord_flip() +
   xlim(rev(levels(factor(var2_adj_list$Mutated_Gene))))
 
+p + facet_grid(. ~ Variable)
+
+# library(grid)
+# variables = c("Age", "Platelet", "Hemoglobin", "WBC", "LDH", "BM_blast_percent", "PB_blast_percent")
+# colors = c("#bdbdbd",  "#fb6a4a", "#fe9929", "#d4b9da", "#238443", "#e6ab02", "#8dd3c7")
+# g <- ggplot_gtable(ggplot_build(p))
+# strip_t <- which(grepl('strip-t', g$layout$name))
+# fills <- c("#d4b9da","#fe9929","#fb6a4a","#238443", "#e6ab02", "#8dd3c7", "lightgrey")
+# k <- 1
+# for (i in strip_t) {
+#   j <- which(grepl('rect', g$grobs[[i]]$grobs[[1]]$VariableOrder))
+#   g$grobs[[i]]$grobs[[1]]$Variable[[j]]$gp$fill <- fills[k]
+#   k <- k+1
+# }
+# grid.draw(g)
+
 p + facet_grid(. ~ Variable) +
-  theme(strip.background = element_rect(colour="black", fill="white", 
+  theme(strip.background = element_rect(colour="black", fill="white",
                                         size=1.5, linetype="solid"))
 
-ggsave(filename = "~/Desktop/MetaAML_results/Figure_3/VAF_clinical_features_discrete.png", dpi = 300, width = 15, height = 5, units = "in") 
+ggsave(filename = "~/Desktop/MetaAML_results/Figure_3/VAF_clinical_features_discrete.png", dpi = 300, width = 15, height = 6, units = "in") 
+
+write.csv(var2_adj_list, "~/Desktop/MetaAML_results/Figure_3/VAF_discrete_clinical_features.csv")
 
 
 
+# optimal vaf cutoff ####
+dir.create("~/Desktop/MetaAML_results/Figure_3/Supplimental/optimal_vaf_thresholds")
+dir.create("~/Desktop/MetaAML_results/Figure_3/Supplimental/optimal_vaf_thresholds/logrank_plots")
 
-
-# static vaf cutoff ####
 load("~/Desktop/MetaAML_results/final_data_matrix_2.RData")
 
 final_data_matrix_2_sub = subset(final_data_matrix_2, final_data_matrix_2$mut_freq_gene >= 50 & final_data_matrix_2$Gene != "MLL" & final_data_matrix_2$Subset == "de_novo")
@@ -919,377 +748,25 @@ for(i in 1:nrow(final_data_matrix_2_sub)){
   if(final_data_matrix_2_sub$Gene[i] == "FLT3" & final_data_matrix_2_sub$variant_type[i] == "ITD"){
     final_data_matrix_2_sub$Gene[i] = "FLT3-ITD"
   }
-}
-
-n=n_distinct(final_data_matrix_2_sub$Gene)
-genes=data.frame(unique(final_data_matrix_2_sub$Gene))
-
-
-results_list = list()
-results_list_median = list()
-
-n=1
-for(i in 1:nrow(genes)){
-  gene=genes[i,1]
-  mut_pts=subset(final_data_matrix_2_sub, Gene == genes[i,1])
-  mut_pts = distinct(mut_pts, Sample, Gene, VAF, VAF_CN_corrected, Time_to_OS, Censor)
-  mut_pts$hr_stratifier_vaf = 0
-  mut_pts$hr_stratifier_vaf_text = "Low"
-  mut_pts$hr_stratifier_vaf_median = 0
-  mut_pts$hr_stratifier_vaf_median_text = "Below"
-  
-  mut_pts <- mut_pts[order(mut_pts$Sample, -mut_pts$VAF_CN_corrected),]
-  mut_pts= mut_pts[!duplicated(mut_pts$Sample),]
-  
-  for(j in 1:nrow(mut_pts)){
-    if(!is.na(mut_pts$VAF_CN_corrected[j])){
-      # try splitting by median and 0.3
-      if(mut_pts$VAF_CN_corrected[j] >= 30){
-        mut_pts$hr_stratifier_vaf[j] = 1
-        mut_pts$hr_stratifier_vaf_text[j] = "High"
-      } 
-      if(mut_pts$VAF_CN_corrected[j] >= mean(mut_pts$VAF_CN_corrected, na.rm = T)){
-        mut_pts$hr_stratifier_vaf_median[j] = 1
-        mut_pts$hr_stratifier_vaf_median_text[j] = "Above"
-      } 
-    }
+  if(final_data_matrix_2_sub$Gene[i] == "FLT3" & final_data_matrix_2_sub$variant_type[i] == "Deletion"){
+    final_data_matrix_2_sub$Gene[i] = "FLT3-TKD"
   }
-  
-  # run the Cox model
-  mut_pts$Time_to_OS=as.numeric(mut_pts$Time_to_OS)
-  
-  mut_pts$Censor = as.numeric(mut_pts$Censor)
-  
-  # analyze the dynamic median VAF survival results
-  model_median <- coxph( Surv(Time_to_OS, Censor) ~ hr_stratifier_vaf_median,
-                  data = mut_pts)
-  
-  # extract the informative data from the survival model
-  array_dat = summary(model_median)$conf.int[1:4]
-  array_dat[5] = genes[i,1]
-  
-  # extract the log-rank p-value for the individual comparisons
-  array_dat[6] = summary(model_median)$sctest[3]
-  array_dat = array_dat[-2]
-
-  forest_plot_data_median <- data.frame("Gene" = array_dat[4], "HR" = array_dat[1], "Lower_CI" = array_dat[2], "Upper_CI" = array_dat[3], "log_rank_p" = array_dat[5])
-  
-  results_list_median[[n]] <- forest_plot_data_median
-  
-  p1=forest_plot_data_median$log_rank_p
-  
-  # plot if significant
-  if(p1 <= 0.05){
-    # plots the survival
-    
-    OS_fit <- survfit(Surv(Time_to_OS, Censor) ~ 1, data=mut_pts)
-    OS_trt_fit <- survfit(Surv(Time_to_OS, Censor) ~ hr_stratifier_vaf_text, data=mut_pts, conf.type = "log-log")
-    
-    surv_plot <- ggsurvplot(OS_trt_fit,
-                            data = mut_pts,
-                            log = (OS_trt_fit),
-                            log.rank.weights = c("survdiff"),
-                            pval = T,
-                            test.for.trend = F,
-                            pval.method.size = 3,
-                            pval.coord = c(0, 0),
-                            conf.int = F,
-                            censor = T,
-                            surv.median.line = "none",
-                            risk.table = F,
-                            risk.table.title = "",
-                            risk.table.fontsize = 4,
-                            risk.table.height = .3,
-                            risk.table.y.text = T,
-                            break.time.by = 5,
-                            risk.table.pos = c("out"),
-                            palette = c("Above" = "#6A6599FF", "Below" = "#80796BFF"),
-                            xlab = "Years",
-                            ylim = c(0, 1.0),
-                            ylab =  "Survival Probability",
-                            font.main = c(15, "plain", "#252525"),
-                            pval.size = 4,
-                            font.x = c(12, "plain", "#252525"),
-                            font.y =  c(12, "plain", "#252525"),
-                            font.legend = c(12, "plain"),
-                            font.tickslab = c(12, "plain", "#252525"),
-                            legend.labs = c("0" = "Above", "1" = "Below"),
-                            legend.title = paste("Median VAF"),
-                            legend = "right",
-                            title = gene,
-                            ggtheme = theme_cowplot()
-                            # ggtheme = theme(plot.title = element_text(hjust = 0.5))
-    )
-    
-    print(surv_plot)
-    png(filename = paste("~/Desktop/MetaAML_results/Figure_3/Supplimental/",gene,"survival_by_median_VAF.png", sep = ""), res = 300, width = 3.5, height = 3.5, units = "in")
-    
-    surv_plot
-    print(surv_plot)
-    dev.off()
+  if(final_data_matrix_2_sub$Gene[i] == "FLT3" & final_data_matrix_2_sub$variant_type[i] == "INDEL"){
+    final_data_matrix_2_sub$Gene[i] = "FLT3-ITD"
   }
-  
-  
-  
-  ## analyze the 0.3 threshold survival results
-  model <- coxph( Surv(Time_to_OS, Censor) ~ hr_stratifier_vaf,
-                  data = mut_pts)
-  
-  # extract the informative data from the survival model
-  array_dat = summary(model)$conf.int[1:4]
-  array_dat[5] = genes[i,1]
-  
-  # extract the log-rank p-value for the individual comparisons
-  array_dat[6] = summary(model)$sctest[3]
-  array_dat = array_dat[-2]
-  
-  forest_plot_data <- data.frame("Gene" = array_dat[4], "HR" = array_dat[1], "Lower_CI" = array_dat[2], "Upper_CI" = array_dat[3], "log_rank_p" = array_dat[5])
-  
-  results_list[[n]] <- forest_plot_data
-  n=n+1   
-  
-  p2=forest_plot_data$log_rank_p
-  
-  # plot if significant
-  if(p2 <= 0.05){
-    # plots the survival
-
-    OS_fit <- survfit(Surv(Time_to_OS, Censor) ~ 1, data=mut_pts)
-    OS_trt_fit <- survfit(Surv(Time_to_OS, Censor) ~ hr_stratifier_vaf_text, data=mut_pts, conf.type = "log-log")
-    
-    surv_plot <- ggsurvplot(OS_trt_fit,
-                            data = mut_pts,
-                            log = (OS_trt_fit),
-                            log.rank.weights = c("survdiff"),
-                            pval = T,
-                            test.for.trend = F,
-                            pval.method.size = 3,
-                            pval.coord = c(0, 0),
-                            conf.int = F,
-                            censor = T,
-                            surv.median.line = "none",
-                            risk.table = F,
-                            risk.table.title = "",
-                            risk.table.fontsize = 4,
-                            risk.table.height = .3,
-                            risk.table.y.text = T,
-                            break.time.by = 5,
-                            risk.table.pos = c("out"),
-                            palette = c("High" = "#6A6599FF", "Low" = "#80796BFF"),
-                            xlab = "Years",
-                            ylim = c(0, 1.0),
-                            ylab =  "Survival Probability",
-                            font.main = c(15, "plain", "#252525"),
-                            pval.size = 4,
-                            font.x = c(12, "plain", "#252525"),
-                            font.y =  c(12, "plain", "#252525"),
-                            font.legend = c(12, "plain"),
-                            font.tickslab = c(12, "plain", "#252525"),
-                            legend.labs = c("0" = "High", "1" = "Low"),
-                            legend.title = paste("VAF"),
-                            legend = "right",
-                            title = gene,
-                            ggtheme = theme_cowplot()
-                            # ggtheme = theme(plot.title = element_text(hjust = 0.5))
-                            )
-    
-    print(surv_plot)
-    png(filename = paste("~/Desktop/MetaAML_results/Figure_3/Supplimental/",gene,"survival_by_30_VAF.png", sep = ""), res = 300, width = 3.5, height = 3.5, units = "in")
-    
-    surv_plot
-    print(surv_plot)
-    dev.off()
+  if(final_data_matrix_2_sub$Gene[i] == "FLT3" & final_data_matrix_2_sub$variant_type[i] == "other"){
+    final_data_matrix_2_sub$Gene[i] = "FLT3-TKD"
   }
 }
 
- temp_final = as.data.frame(do.call(rbind, results_list))
-temp_final_median = as.data.frame(do.call(rbind, results_list_median))
-
-# plot the results for 0.3 VAF cuttoff
-temp_final$Gene <- factor(temp_final$Gene, levels = temp_final$Gene[order(temp_final$HR)])
-
-temp_final$sig_color = 0
-
-for(i in 1:nrow(temp_final)){
-  if(temp_final$log_rank_p[i] < 0.05){
-    temp_final$sig_color[i] =1
-  }
-}
-
-temp_final$sig_color = as.factor(temp_final$sig_color)
-
-temp_final$fdr = p.adjust(temp_final$log_rank_p, method = "fdr")
-
-temp_final$sig_color = as.factor(temp_final$sig_color)
-# temp_final_hr_order_15$categories = as.factor(temp_final_hr_order_15$categories)
-# temp_final_hr_order_15$HR = as.numeric(temp_final_hr_order_15$HR)
-
-temp_final = subset(temp_final, temp_final$Upper_CI != "Inf")
-
-# temp_final$categories <- reorder(temp_final$categories, temp_final$HR)
-
-temp_final$p_text = NA
-temp_final$q_text = NA
-for(i in 1:nrow(temp_final)){
-  if(temp_final$log_rank_p[i] < 0.05){
-    temp_final$p_text[i] = temp_final$log_rank_p[i]
-    temp_final$q_text[i] = temp_final$fdr[i]
-  }
-}
-# temp_final$q_text = NA
-# for(i in 1:nrow(temp_final)){
-#   if(temp_final$fdr[i] < 0.2){
-#     temp_final$q_text[i] = temp_final$fdr[i]
-#   }
-# }
-
-temp_final$p_text = as.numeric(temp_final$p_text)
-temp_final$q_text = as.numeric(temp_final$q_text)
-
-temp_final$p_text = round(temp_final$p_text, 3)
-temp_final$q_text = round(temp_final$q_text, 2)
-
-temp_final$p_q_text = paste("p =", temp_final$p_text, "; q =", temp_final$q_text)
-temp_final$p_text = paste("p =", temp_final$p_text)
-
-for(i in 1:nrow(temp_final)){
-  if(temp_final$log_rank_p[i] > 0.05){
-    temp_final$p_q_text[i] = ""
-  }
-  if(temp_final$log_rank_p[i] > 0.05){
-    temp_final$p_text[i] = ""
-  }
-}
-
-temp_final$HR = as.numeric(temp_final$HR)
-temp_final$Upper_CI = as.numeric(temp_final$Upper_CI)
-temp_final$Lower_CI = as.numeric(temp_final$Lower_CI)
-
-ggplot(temp_final, aes(x = reorder(Gene, -HR), y = HR, label = temp_final$p_q_text)) +
-  geom_hline(yintercept=1, linetype="dashed", color = "black") +
-  geom_hline(yintercept=2, linetype="dashed", color = "lightgrey") +
-  geom_hline(yintercept=3, linetype="dashed", color = "lightgrey") +
-  geom_text(aes(Gene, Upper_CI), hjust = 0, nudge_y = 0.1) +
-  geom_pointrange(size = 0.75, stat = "identity", shape = 19, 
-                  # fill = "white",
-                  aes(x = Gene, ymin = Lower_CI, ymax = Upper_CI, y = HR, color = sig_color)) +
-  scale_color_manual(values = c("0" = "darkgrey", "1" = "darkred"))+
-  ylab("Hazard Ratio")+
-  theme_cowplot() +
-  ylim(0,14) +
-  theme(legend.position = "none",
-        axis.title.y=element_blank()) +
-  coord_flip() 
-
-ggsave(filename = "~/Desktop/MetaAML_results/Figure_3/Supplimental/gene_vaf_discrete_hr_forest_plot_de_novo_30.pdf", dpi = 300, width = 5, height = 7.5, units = "in")
-
-write.csv(temp_final, "~/Desktop/MetaAML_results/Data/Tables/static_vaf_threshold_survival.csv")
-
-
-
-
-# plot the results for median VAF cuttoff
-temp_final_median$Gene <- factor(temp_final_median$Gene, levels = temp_final_median$Gene[order(temp_final_median$HR)])
-
-temp_final_median$sig_color = 0
-
-for(i in 1:nrow(temp_final_median)){
-  if(temp_final_median$log_rank_p[i] < 0.05){
-    temp_final_median$sig_color[i] =1
-  }
-}
-
-temp_final_median$sig_color = as.factor(temp_final_median$sig_color)
-
-temp_final_median$fdr = p.adjust(temp_final_median$log_rank_p, method = "fdr")
-
-temp_final_median$sig_color = as.factor(temp_final_median$sig_color)
-# temp_final_hr_order_15$categories = as.factor(temp_final_hr_order_15$categories)
-# temp_final_hr_order_15$HR = as.numeric(temp_final_hr_order_15$HR)
-
-temp_final_median = subset(temp_final_median, temp_final_median$Upper_CI != "Inf")
-
-temp_final_median$categories <- reorder(temp_final_median$categories, temp_final_median$HR)
-
-temp_final_median$p_text = NA
-for(i in 1:nrow(temp_final_median)){
-  if(temp_final_median$log_rank_p[i] < 0.05){
-    temp_final_median$p_text[i] = temp_final_median$log_rank_p[i]
-  }
-}
-temp_final_median$q_text = NA
-for(i in 1:nrow(temp_final_median)){
-  if(temp_final_median$fdr[i] < 0.2){
-    temp_final_median$q_text[i] = temp_final_median$fdr[i]
-  }
-}
-
-temp_final_median$p_text = as.numeric(temp_final_median$p_text)
-temp_final_median$q_text = as.numeric(temp_final_median$q_text)
-
-temp_final_median$p_text = round(temp_final_median$p_text, 3)
-temp_final_median$q_text = round(temp_final_median$q_text, 2)
-
-for(i in 1:nrow(temp_final_median)){
-  if(temp_final_median$log_rank_p[i] < 0.01){
-    temp_final_median$p_text[i] = "p < 0.01"
-  }
-  if(temp_final_median$log_rank_p[i] >= 0.01 & temp_final_median$log_rank_p[i] <= 0.05){
-    temp_final_median$p_text[i] = paste("p = ", paste(temp_final_median$p_text[i]))
-  }
-}
-  
-temp_final_median$p_q_text = paste("p = ", temp_final_median$p_text, "; q =", temp_final_median$q_text, sep = "")
-
-for(i in 1:nrow(temp_final_median)){
-  if(temp_final_median$log_rank_p[i] > 0.05){
-    temp_final_median$p_q_text[i] = ""
-  }
-  if(temp_final_median$log_rank_p[i] > 0.05){
-    temp_final_median$p_text[i] = ""
-  }
-}
-
-
-temp_final_median$HR = as.numeric(temp_final_median$HR)
-temp_final_median$Upper_CI = as.numeric(temp_final_median$Upper_CI)
-temp_final_median$Lower_CI = as.numeric(temp_final_median$Lower_CI)
-
-ggplot(temp_final_median, aes(x = reorder(Gene, -HR), y = HR, label = temp_final_median$p_q_text)) +
-  geom_hline(yintercept=1, linetype="dashed", color = "black") +
-  geom_hline(yintercept=2, linetype="dashed", color = "lightgrey") +
-  geom_hline(yintercept=3, linetype="dashed", color = "lightgrey") +
-  geom_text(aes(Gene, Upper_CI), hjust = 0, nudge_y = 0.1) +
-  geom_pointrange(size = 0.75, stat = "identity", shape = 19, 
-                  # fill = "white",
-                  aes(x = Gene, ymin = Lower_CI, ymax = Upper_CI, y = HR, color = sig_color)) +
-  scale_color_manual(values = c("0" = "darkgrey", "1" = "darkred"))+
-  ylab("Hazard Ratio")+
-  theme_cowplot() +
-  ylim(0,18)+
-  theme(legend.position = "none",
-        axis.title.y=element_blank()) +
-  coord_flip()
-
-ggsave(filename = "~/Desktop/MetaAML_results/Figure_3/Supplimental/gene_vaf_discrete_hr_forest_plot_de_novo_median.pdf", dpi = 300, width = 5, height = 7.5, units = "in")
-
-write.csv(temp_final, "~/Desktop/MetaAML_results/Data/Tables/static_vaf_threshold_survival.csv")
-
-
-
-
-
-
-
-# optimal vaf cutoff ####
-dir.create("~/Desktop/MetaAML_results/Figure_3/optimal_vaf_thresholds")
-
+genes = data.frame(unique(final_data_matrix_2_sub$Gene))
+genes = genes %>%
+  arrange(genes,unique.final_data_matrix_2_sub.Gene.)
 # now define the optimal VAF cutoff for each gene
-z <- 1
-temp_list <- list()
-
 results_list = list()
-n=1
+n = 1
+
+plot_list = list()
 
 for(i in 1:nrow(genes)){
   print(i)
@@ -1312,7 +789,7 @@ for(i in 1:nrow(genes)){
                           smethod="LogRank", pmethod="exactGauss", 
                           abseps=0.01)
     
-    png(filename = paste("~/Desktop/MetaAML_results/Figure_3/optimal_vaf_thresholds/", gene, "_vaf_logrank_plot.png"),res = 300, width = 5, height = 5, units = "in")
+    png(filename = paste("~/Desktop/MetaAML_results/Figure_3/Supplimental/optimal_vaf_thresholds/logrank_plots/", gene, "_vaf_logrank_plot.png", sep = ""),res = 300, width = 5, height = 5, units = "in")
     plot(mstat)
     dev.off() 
     
@@ -1330,76 +807,14 @@ for(i in 1:nrow(genes)){
     }
     
     if(n_distinct(final_data_matrix_2_sub2$vaf_threshold) > 1){
-      # create the survival data object
+      
+      # summarize results from a Cox model
+      final_data_matrix_2_sub2$vaf_threshold = ifelse(final_data_matrix_2_sub2$vaf_threshold == "over", 1,0)
       
       OS_fit <- survfit(Surv(Time_to_OS, Censor) ~ 1, data=final_data_matrix_2_sub2)
       OS_trt_fit <- survfit(Surv(Time_to_OS, Censor) ~ vaf_threshold, data=final_data_matrix_2_sub2, conf.type = "log-log")
       
-      p <- surv_pvalue(OS_trt_fit)$pval
-      
-      # print(p)
-      # store the results in a dataframe
-      temp <- data.frame(matrix(NA, nrow = 1, ncol = 3))
-      names(temp) <- c("Gene", "vaf_threshold", "p_value")
-      
-      temp[1,1] <- gene
-      temp[1,2] <- threshold
-      temp[1,3] <- p
-      
-      z <- z + 1
-      temp_list[[z]] <- temp
-      
-      cohorts <- c("over", "under")
-      
-      title <- paste(threshold, "VAF\nthreshold",sep = " ")
-      
-      if(p <= 0.05){
-        # plots the survival
-        surv_plot <- ggsurvplot(OS_trt_fit,
-                                data = final_data_matrix_2_sub2,
-                                log = (OS_trt_fit),
-                                log.rank.weights = c("survdiff"),
-                                pval = T,
-                                test.for.trend = F,
-                                pval.method.size = 3,
-                                pval.coord = c(0, 0),
-                                conf.int = F,
-                                censor = T,
-                                surv.median.line = "none",
-                                risk.table = T,
-                                risk.table.title = "",
-                                risk.table.fontsize = 4,
-                                risk.table.height = .3,
-                                risk.table.y.text = T,
-                                break.time.by = 5,
-                                risk.table.pos = c("out"),
-                                palette = c("over" = "#6A6599FF",  "under" = "#80796BFF"),
-                                xlab = "Years",
-                                ylim = c(0, 1.0),
-                                ylab =  "Survival Probability",
-                                font.main = c(15, "plain", "#252525"),
-                                pval.size = 4,
-                                font.x = c(12, "plain", "#252525"),
-                                font.y =  c(12, "plain", "#252525"),
-                                font.legend = c(12, "plain"),
-                                font.tickslab = c(12, "plain", "#252525"),
-                                legend.labs = cohorts,
-                                legend.title = paste(title),
-                                legend = "right",
-                                title = gene,
-                                ggtheme = theme_cowplot())
-                                # (plot.title = element_text(hjust = 0.5)))
-        
-        print(surv_plot)
-        png(filename = paste("~/Desktop/MetaAML_results/Figure_3/optimal_vaf_thresholds/",gene,"survival_by_VAF.png"), res = 300, width = 5, height = 5, units = "in")
-        
-        surv_plot
-        print(surv_plot)
-        dev.off()
-      }
-      # summarize results from a Cox model
-      final_data_matrix_2_sub2$vaf_threshold = ifelse(final_data_matrix_2_sub2$vaf_threshold == "over", 1,0)
-      
+      # run the Cox model
       model <- coxph( Surv(Time_to_OS, Censor) ~ vaf_threshold,
                       data = final_data_matrix_2_sub2 )
       
@@ -1411,19 +826,77 @@ for(i in 1:nrow(genes)){
       array_dat[6] = summary(model)$sctest[3]
       array_dat = array_dat[-2]
       
-      forest_plot_data <- data.frame("Gene" = array_dat[4], "HR" = array_dat[1], "Lower_CI" = array_dat[2], "Upper_CI" = array_dat[3], "log_rank_p" = array_dat[5])
+      forest_plot_data <- data.frame("Gene" = array_dat[4], "HR" = array_dat[1], "Lower_CI" = round(as.numeric(array_dat[2]),2), "Upper_CI" = round(as.numeric(array_dat[3]),2), "log_rank_p" = array_dat[5], "VAF_threshold" = threshold)
       
       results_list[[n]] <- forest_plot_data
       n=n+1   
+      
+      p = round(summary(model)$sctest[3],3)
+      
+      if(p <= 0.05){
+        print(gene)
+        
+        p = ifelse(p < 0.001, paste0("p < 0.001"), paste("p =", p))
+        
+        hr = paste("HR = ", round(as.numeric(forest_plot_data$HR), 2), " (", forest_plot_data$Lower_CI, "-", forest_plot_data$Upper_CI, ")", sep = "")
+        
+        p_hr = paste(p, "\n", hr, sep = "")
+        
+        cohorts <- c("over", "under")
+        
+        title <- paste(threshold, "VAF\nthreshold",sep = " ")
+        
+        # plots the survival
+        plot_list[[i]] = ggsurvplot(OS_trt_fit,
+                                data = final_data_matrix_2_sub2,
+                                log = (OS_trt_fit),
+                                log.rank.weights = c("survdiff"),
+                                pval = paste0(p_hr),
+                                test.for.trend = F,
+                                pval.method.size = 3,
+                                pval.coord = c(3, 0.95),
+                                conf.int = F,
+                                censor = T,
+                                surv.median.line = "none",
+                                risk.table = T,
+                                risk.table.title = c("Number at risk"),
+                                risk.table.fontsize = 4,
+                                risk.table.height = .3,
+                                risk.table.y.text = T,
+                                break.time.by = 5,
+                                risk.table.pos = c("out"),
+                                palette = c("over" = "#6A6599FF",  "under" = "#80796BFF"),
+                                xlab = "Years",
+                                ylim = c(0, 1.0),
+                                ylab =  "Survival Probability",
+                                font.main = c(15, "plain", "#252525"),
+                                ggtheme = theme_cowplot(),
+                                pval.size = 4,
+                                font.x = c(15, "plain", "#252525"),
+                                font.y =  c(15, "plain", "#252525"),
+                                font.legend = c(15, "plain"),
+                                font.tickslab = c(15, "plain", "#252525"),
+                                legend.labs = cohorts,
+                                legend.title = paste(title),
+                                legend = "right",
+                                title = gene)
+
+      }
     }
   }
 }
 
-temp_final = as.data.frame(do.call(rbind, temp_list))
-temp_final$q_value <- p.adjust(temp_final$q_value, method = "fdr")
+temp_final = as.data.frame(do.call(rbind, results_list))
+temp_final$q_value = p.adjust(temp_final$log_rank_p, method = "fdr")
 
-write.csv(temp_final,  file = "~/Desktop/MetaAML_results/Figure_3/optimal_vaf_thresholds/optimal_vaf_threshold_for_survival_prediction.csv", row.names = F)
+write.csv(temp_final,  file = "~/Desktop/MetaAML_results/Figure_3/Supplimental/optimal_vaf_thresholds/optimal_vaf_threshold_for_survival_prediction.csv", row.names = F)
 
+# summary plot of all optimal survival curves
+plot_list = list.clean(plot_list)
+
+plots = arrange_ggsurvplots(plot_list, print = FALSE,
+                            ncol = 3, nrow = 3)
+ggsave("~/Desktop/MetaAML_results/Figure_3/Supplimental/optimal_VAF_survival_grid.pdf", plots, width = 13.5, height = 13.5)
 
 # forrest plot of HRs ####
 temp_final_hr = as.data.frame(do.call(rbind, results_list))
@@ -1472,11 +945,11 @@ for(i in 1:nrow(temp_final_hr)){
     temp_final_hr$p_text[i] = "p < 0.01"
   }
   if(temp_final_hr$log_rank_p[i] >= 0.01 & temp_final_hr$log_rank_p[i] <= 0.05){
-    temp_final_hr$p_text[i] = paste("p = ", paste(temp_final_hr$p_text[i]))
+    temp_final_hr$p_text[i] = paste("p =", paste(temp_final_hr$p_text[i]))
   }
 }
 
-temp_final_hr$p_q_text = paste(temp_final_hr$p_text, "; q =", temp_final_hr$q_text, sep = "")
+temp_final_hr$p_q_text = paste(temp_final_hr$p_text, "; q = ", temp_final_hr$q_text, sep = "")
 
 for(i in 1:nrow(temp_final_hr)){
   if(temp_final_hr$log_rank_p[i] > 0.05){
@@ -1500,7 +973,7 @@ ggplot(temp_final_hr, aes(x = reorder(Gene, -HR), y = HR, label = temp_final_hr$
                   # fill = "white",
                   aes(x = Gene, ymin = Lower_CI, ymax = Upper_CI, y = HR, color = sig_color)) +
   scale_color_manual(values = c("0" = "#737373", "1" = "#1b7837", "2" = "#762a83"))+
-  ylab("Hazard Ratio")+
+  ylab("Hazard Ratio\n(high VAF vs. low VAF)")+
   # ylim(0,11.5)+
   theme_cowplot() +
   theme(legend.position = "none",
@@ -1508,7 +981,603 @@ ggplot(temp_final_hr, aes(x = reorder(Gene, -HR), y = HR, label = temp_final_hr$
   coord_flip()
 
 
-ggsave(filename = "~/Desktop/MetaAML_results/Figure_3/optimal_vaf_thresholds/gene_vaf_optimal_vaf_thresholds_hr_forest_plot_de_novo.pdf", dpi = 300, width = 5, height = 7.5, units = "in")
+ggsave(filename = "~/Desktop/MetaAML_results/Figure_3/gene_vaf_optimal_vaf_thresholds_hr_forest_plot_de_novo.pdf", dpi = 300, width = 5, height = 6, units = "in")
+
+
+# HR differences ####
+gene_hrs = read.csv("~/Desktop/MetaAML_results/Figure_2/Supplimental/gene_hazard_ratio.csv")
+gene_vaf_hrs = read.csv("~/Desktop/MetaAML_results/Figure_3/Supplimental/optimal_vaf_thresholds/optimal_vaf_threshold_for_survival_prediction.csv")
+
+gene_hrs = gene_hrs %>% 
+  select(gene, HR, lower_95, upper_95, q_value)
+
+names(gene_hrs) = c("Gene", "HR", "gene_lower_95", "gene_upper_95", "gene_q_value")
+
+gene_vaf_hrs = gene_vaf_hrs %>% 
+  select(Gene, HR, Lower_CI, Upper_CI, q_value, VAF_threshold)
+
+names(gene_vaf_hrs) = c("Gene", "VAF_HR", "VAF_lower_95", "VAF_upper_95", "VAF_q_value", "VAF_threshold")
+
+hr_comparision = left_join(gene_vaf_hrs, gene_hrs, by = "Gene")
+
+hr_comparision$sig = ifelse(hr_comparision$VAF_q_value < 0.1, "q < 0.1", "q > 0.1")
+
+hr_comparision$ratio = hr_comparision$VAF_HR/hr_comparision$HR
+hr_comparision$label = NA
+
+for(i in 1:nrow(hr_comparision)){
+  if(hr_comparision$VAF_q_value[i] <= 0.1 | hr_comparision$ratio[i] > 2 | hr_comparision$ratio[i] < 0.5){
+    hr_comparision$label[i] = hr_comparision$Gene[i]
+  }
+}
+
+p =  ggplot(hr_comparision, aes(x=HR, y = VAF_HR, color = sig)) +
+        theme_cowplot() +
+  geom_segment(aes(x = 0, xend =4, y = 1, yend = 1),
+               colour = "lightgrey",lty = "dashed") +
+  # geom_errorbar(aes(ymin = VAF_lower_95, ymax = VAF_upper_95), alpha = .15) +
+  # geom_errorbarh(aes(xmin = gene_lower_95, xmax = gene_upper_95), alpha = .15) +
+        geom_point(aes(size = VAF_threshold), alpha = .9) +
+  geom_point(aes(size = VAF_threshold), shape = 1, colour = "black") +
+        scale_colour_manual(values = c("q < 0.1"= "#8073ac","q > 0.1"="#737373")) + 
+        geom_label_repel(aes(label=label),size = 3, force = 25, show_guide = F, max.overlaps = 15) +
+        coord_cartesian(ylim=c(0,5.5), xlim=c(0,4)) +
+        ylab(label= "Hazard Ratio\n(high VAF vs. low VAF)") +
+        xlab(label= "Hazard Ratio\n(Mutated vs. WT)") +
+        theme(legend.position=c(0.65,0.75)) 
+  
+g = guide_legend(override.aes=list(colour="grey"), "VAF threshold")
+h = guide_legend("VAF HR")
+p  + guides(color = h, size = g)
+
+ggsave(filename = "~/Desktop/MetaAML_results/Figure_3/HR_vs_VAF_HR.pdf", dpi = 300, width = 4.5, height = 6, units = "in")
+
+
+# Effect size differences ####
+gene_effect_size = read.csv("~/Desktop/MetaAML_results/Figure_2/Supplimental/gene_clinical_features.csv")
+gene_vaf_effect_size = read.csv("~/Desktop/MetaAML_results/Figure_3/VAF_discrete_clinical_features.csv")
+
+gene_effect_size = gene_effect_size %>% 
+  select(Variable, Gene, effect_size, n_mut, q_val) %>%
+  subset(Variable %in% c("WBC", "PB_blast_percent"))
+
+names(gene_effect_size) = c("Variable", "Gene", "effect_size", "n_mut", "q_value")
+
+gene_vaf_effect_size = gene_vaf_effect_size %>% 
+  select(Variable, Mutated_Gene, effect_size, q_val) %>%
+  subset(Variable %in% c("WBC", "PB_blast_percent"))
+
+names(gene_vaf_effect_size) = c("Variable", "Gene", "effect_size_vaf", "q_value_vaf")
+
+es_comparision = inner_join(gene_vaf_effect_size, gene_effect_size, by = c("Variable", "Gene"))
+
+es_comparision$sig_color = "q > 0.1"
+
+for(i in 1:nrow(es_comparision)){
+  if(es_comparision$q_value_vaf[i] < 0.1 & es_comparision$Variable[i] == "WBC"){
+    es_comparision$sig_color[i] = "WBC q < 0.1"
+  }
+  if(es_comparision$q_value_vaf[i] < 0.1 & es_comparision$Variable[i] == "PB_blast_percent"){
+    es_comparision$sig_color[i] = "PB q < 0.1"
+  }
+}
+
+es_comparision$ratio = es_comparision$effect_size_vaf/es_comparision$effect_size
+es_comparision$label = NA
+
+for(i in 1:nrow(es_comparision)){
+  if(es_comparision$q_value_vaf[i] < 0.1){
+    es_comparision$label[i] = es_comparision$Gene[i]
+  }
+}
+
+es_comparision$Variable = factor(es_comparision$Variable, levels = c("PB_blast_percent", "WBC"))
+
+p = ggplot(es_comparision, aes(x=effect_size, y = effect_size_vaf, color = factor(sig_color))) +
+  theme_cowplot() +
+  geom_hline(yintercept = 0,  linetype = "dashed", color = "lightgrey") +
+  geom_vline(xintercept = 0,  linetype = "dashed", color = "lightgrey") +
+  geom_point(aes(size = n_mut), alpha = 1) +
+  geom_point(aes(size = n_mut), shape = 1, colour = "black") +
+  scale_colour_manual(values = c("WBC q < 0.1"= "#d4b9da","PB q < 0.1"="#8dd3c7", "q > 0.1" = "#737373")) + 
+  geom_label_repel(aes(label=label),size = 3, force = 50, show_guide = F, max.overlaps = 15) +
+  ylab(label= "Effect Size\n(high VAF vs. low VAF)") +
+  xlab(label= "Effect Size\n(Mutated vs. WT)") +
+  theme(legend.position="right") 
+
+g = guide_legend(override.aes=list(colour="grey"), "n. pts")
+h = guide_legend("VAF effect size")
+
+p + facet_wrap(. ~ Variable, ncol = 1, nrow = 2) + guides(size = g, color = FALSE) +
+  theme(
+    strip.background = element_rect(colour="black", fill="white", 
+                                    size=1.5, linetype="solid")) + guides(color = h, size = g) 
+
+ggsave(filename = "~/Desktop/MetaAML_results/Figure_3/WBC_ES_vs_VAF_ES.pdf", dpi = 300, width = 5, height = 6, units = "in")
+
+
+
+# Supplimental ####
+
+# VAf distribution ####
+load("~/Desktop/MetaAML_results/final_data_matrix.RData")
+
+vaf_sub = subset(final_data_matrix, final_data_matrix$Subset == "de_novo")
+vaf_sub = subset(vaf_sub, vaf_sub$mut_freq_gene >= 50)
+vaf_sub = subset(vaf_sub, vaf_sub$Gene != "MLL")
+
+# make sure that the FLT3 symbols are annotated properly
+for(i in 1:nrow(vaf_sub)){
+  if(vaf_sub$Gene[i] == "FLT3" & vaf_sub$variant_type[i] == "ITD"){
+    vaf_sub$Gene[i] <- "FLT3-ITD"
+  }
+  if(vaf_sub$Gene[i] == "FLT3" & vaf_sub$variant_type[i] == "SNV"){
+    vaf_sub$Gene[i] <- "FLT3-TKD"
+  }
+  if(vaf_sub$Gene[i] == "FLT3" & vaf_sub$variant_type[i] == "Deletion"){
+    vaf_sub$Gene[i] <- "FLT3-TKD"
+  }
+  if(vaf_sub$Gene[i] == "FLT3" & vaf_sub$variant_type[i] == "INDEL"){
+    vaf_sub$Gene[i] <- "FLT3-ITD"
+  }
+  if(vaf_sub$Gene[i] == "FLT3" & vaf_sub$variant_type[i] == "other"){
+    vaf_sub$Gene[i] <- "FLT3-TKD"
+  }
+}
+
+vaf_sub = select(vaf_sub, Sample, Gene, VAF_male_x, variant_type)
+
+vaf_sub$threshold = ifelse(vaf_sub$VAF_male_x >= 30 , "High", "Low")
+
+vaf_sub = subset(vaf_sub, vaf_sub$threshold == "High" | vaf_sub$threshold == "Low")
+
+vaf_sub$VAF_male_x=as.numeric(vaf_sub$VAF_male_x)
+vaf_sub$Gene = as.character(vaf_sub$Gene)
+
+vaf_sub$Gene <- with(vaf_sub, reorder(Gene, -VAF_male_x, median))
+
+p = ggplot(vaf_sub, aes(x=Gene, y=VAF_male_x)) + 
+  geom_boxplot(notch=F, outlier.colour = "white", color = "#374E55FF", fill = "lightgrey") +
+  geom_jitter(aes(fill = threshold), color = "black", shape = 21, position=position_jitter(0.2), size = 1.5) +
+  scale_fill_manual(values = c("#cb181d", "#3690c0")) +
+  geom_hline(yintercept = 30, color = "#b2182b", linetype="dashed") +
+  theme_cowplot(font_size = 7.5) +
+  labs(title = NULL) +
+  ylab(label = "VAF") +
+  xlab(label = NULL) +
+  theme(legend.position="right") +
+  theme(axis.text.x = element_text(angle = 45, vjust = 1, 
+                                   size = 7.5, hjust = 1),
+        axis.text.y = element_text(size = 7.5))
+
+ggpar(p, legend.title = "")
+ggsave(filename = "~/Desktop/MetaAML_results/Figure_3/Supplimental/MetaAML_vaf_distribution.pdf", dpi = 300, width = 10, height = 3, units = "in")
+
+
+# now plot the VAF distributino per gene colored by whethere the mutation is above or below the mdeian VAF for that gene
+genes = unique(vaf_sub$Gene)
+
+vaf_sub$median_threshold = NA
+
+threshold_list = list()
+z = 1
+
+for(i in 1:length(genes)){
+  
+  # select the gene of interest
+  sub = subset(vaf_sub, Gene == genes[i])
+  
+  # calculate the median vaf based on the X-corrected VAF
+  med_vaf = as.numeric(median(sub$VAF_male_x))
+  
+  sub$median_threshold = ifelse(sub$VAF_male_x >= med_vaf, "High", "Low")
+  
+  threshold_list[[i]] = data.frame(sub)
+  
+}
+
+threshold_list_all = do.call(rbind, threshold_list)
+rm(threshold_list)
+
+threshold_list_all$Gene <- with(threshold_list_all, reorder(Gene, -VAF_male_x, median))
+
+p = ggplot(threshold_list_all, aes(x=Gene, y=VAF_male_x)) + 
+  geom_boxplot(notch=F, outlier.colour = "white", color = "#374E55FF", fill = "lightgrey") +
+  geom_jitter(aes(fill = median_threshold), color = "black", shape = 21, position=position_jitter(0.2), size = 1.5) +
+  scale_fill_manual(values = c("#cb181d", "#3690c0")) +
+  theme_cowplot(font_size = 7.5) +
+  labs(title = NULL) +
+  ylab(label = "VAF") +
+  xlab(label = NULL) +
+  theme(legend.position="right", legend.text = element_text(size = 7.5), axis.text.x = element_text(angle = 45, vjust = 1, 
+                                                                                                    size = 7.5, hjust = 1),
+        axis.text.y = element_text(size = 7.5))
+
+ggpar(p, legend.title = "")
+ggsave(filename = "~/Desktop/MetaAML_results/Figure_3/Supplimental/MetaAML_vaf_distribution_median.pdf", dpi = 300, width = 10, height = 2.5, units = "in")
+
+
+
+# static vaf cutoff ####
+dir.create("~/Desktop/MetaAML_results/Figure_3/Supplimental/Median_VAF")
+dir.create("~/Desktop/MetaAML_results/Figure_3/Supplimental/30_VAF")
+
+load("~/Desktop/MetaAML_results/final_data_matrix_2.RData")
+
+final_data_matrix_2_sub = subset(final_data_matrix_2, final_data_matrix_2$mut_freq_gene >= 50 & final_data_matrix_2$Gene != "MLL" & final_data_matrix_2$Subset == "de_novo")
+final_data_matrix_2_sub$Time_to_OS <- (final_data_matrix_2_sub$Time_to_OS/365)
+
+final_data_matrix_2_sub$Gene = as.character(final_data_matrix_2_sub$Gene)
+
+for(i in 1:nrow(final_data_matrix_2_sub)){
+  if(final_data_matrix_2_sub$Gene[i] == "FLT3" & final_data_matrix_2_sub$variant_type[i] == "SNV"){
+    final_data_matrix_2_sub$Gene[i] = "FLT3-TKD"
+  }
+  if(final_data_matrix_2_sub$Gene[i] == "FLT3" & final_data_matrix_2_sub$variant_type[i] == "ITD"){
+    final_data_matrix_2_sub$Gene[i] = "FLT3-ITD"
+  }
+  if(final_data_matrix_2_sub$Gene[i] == "FLT3" & final_data_matrix_2_sub$variant_type[i] == "Deletion"){
+    final_data_matrix_2_sub$Gene[i] = "FLT3-TKD"
+  }
+  if(final_data_matrix_2_sub$Gene[i] == "FLT3" & final_data_matrix_2_sub$variant_type[i] == "INDEL"){
+    final_data_matrix_2_sub$Gene[i] = "FLT3-ITD"
+  }
+  if(final_data_matrix_2_sub$Gene[i] == "FLT3" & final_data_matrix_2_sub$variant_type[i] == "other"){
+    final_data_matrix_2_sub$Gene[i] = "FLT3-TKD"
+  }
+}
+
+n=n_distinct(final_data_matrix_2_sub$Gene)
+genes=data.frame(unique(final_data_matrix_2_sub$Gene))
+
+
+results_list = list()
+results_list_median = list()
+
+n=1
+for(i in 1:nrow(genes)){
+  gene=genes[i,1]
+  mut_pts=subset(final_data_matrix_2_sub, Gene == genes[i,1])
+  mut_pts = distinct(mut_pts, Sample, Gene, VAF, VAF_CN_corrected, Time_to_OS, Censor)
+  mut_pts$hr_stratifier_vaf = 0
+  mut_pts$hr_stratifier_vaf_text = "Low"
+  mut_pts$hr_stratifier_vaf_median = 0
+  mut_pts$hr_stratifier_vaf_median_text = "Below"
+  
+  mut_pts <- mut_pts[order(mut_pts$Sample, -mut_pts$VAF_CN_corrected),]
+  mut_pts= mut_pts[!duplicated(mut_pts$Sample),]
+  
+  for(j in 1:nrow(mut_pts)){
+    if(!is.na(mut_pts$VAF_CN_corrected[j])){
+      # try splitting by median and 0.3
+      if(mut_pts$VAF_CN_corrected[j] >= 30){
+        mut_pts$hr_stratifier_vaf[j] = 1
+        mut_pts$hr_stratifier_vaf_text[j] = "High"
+      } 
+      if(mut_pts$VAF_CN_corrected[j] >= mean(mut_pts$VAF_CN_corrected, na.rm = T)){
+        mut_pts$hr_stratifier_vaf_median[j] = 1
+        mut_pts$hr_stratifier_vaf_median_text[j] = "Above"
+      } 
+    }
+  }
+  
+  # run the Cox model
+  mut_pts$Time_to_OS=as.numeric(mut_pts$Time_to_OS)
+  
+  mut_pts$Censor = as.numeric(mut_pts$Censor)
+  
+  # analyze the dynamic median VAF survival results
+  model_median <- coxph( Surv(Time_to_OS, Censor) ~ hr_stratifier_vaf_median,
+                         data = mut_pts)
+  
+  # extract the informative data from the survival model
+  array_dat = summary(model_median)$conf.int[1:4]
+  array_dat[5] = genes[i,1]
+  
+  # extract the log-rank p-value for the individual comparisons
+  array_dat[6] = summary(model_median)$sctest[3]
+  array_dat = array_dat[-2]
+  
+  forest_plot_data_median <- data.frame("Gene" = array_dat[4], "HR" = array_dat[1], "Lower_CI" = array_dat[2], "Upper_CI" = array_dat[3], "log_rank_p" = array_dat[5])
+  
+  results_list_median[[n]] <- forest_plot_data_median
+  
+  p1=forest_plot_data_median$log_rank_p
+  
+  # plot if significant
+  if(p1 <= 0.05){
+    # plots the survival
+    
+    OS_fit <- survfit(Surv(Time_to_OS, Censor) ~ 1, data=mut_pts)
+    OS_trt_fit <- survfit(Surv(Time_to_OS, Censor) ~ hr_stratifier_vaf_text, data=mut_pts, conf.type = "log-log")
+    
+    surv_plot <- ggsurvplot(OS_trt_fit,
+                            data = mut_pts,
+                            log = (OS_trt_fit),
+                            log.rank.weights = c("survdiff"),
+                            pval = T,
+                            test.for.trend = F,
+                            pval.method.size = 3,
+                            pval.coord = c(0, 0),
+                            conf.int = F,
+                            censor = T,
+                            surv.median.line = "none",
+                            risk.table = T,
+                            risk.table.title = "",
+                            risk.table.fontsize = 4,
+                            risk.table.height = .4,
+                            risk.table.y.text = T,
+                            break.time.by = 5,
+                            risk.table.pos = c("out"),
+                            palette = c("Above" = "#6A6599FF", "Below" = "#80796BFF"),
+                            xlab = "Years",
+                            ylim = c(0, 1.0),
+                            ylab =  "Survival Probability",
+                            font.main = c(15, "plain", "#252525"),
+                            pval.size = 4,
+                            font.x = c(12, "plain", "#252525"),
+                            font.y =  c(12, "plain", "#252525"),
+                            font.legend = c(12, "plain"),
+                            font.tickslab = c(12, "plain", "#252525"),
+                            legend.labs = c("0" = "Above", "1" = "Below"),
+                            legend.title = paste("Median VAF"),
+                            legend = "right",
+                            title = gene,
+                            ggtheme = theme_cowplot()
+                            # ggtheme = theme(plot.title = element_text(hjust = 0.5))
+    )
+    
+    print(surv_plot)
+    png(filename = paste("~/Desktop/MetaAML_results/Figure_3/Supplimental/Median_VAF/",gene,"_survival_by_median_VAF.png", sep = ""), res = 300, width = 4, height = 4, units = "in")
+    
+    surv_plot
+    print(surv_plot)
+    dev.off()
+  }
+  
+  
+  
+  ## analyze the 0.3 threshold survival results
+  model <- coxph( Surv(Time_to_OS, Censor) ~ hr_stratifier_vaf,
+                  data = mut_pts)
+  
+  # extract the informative data from the survival model
+  array_dat = summary(model)$conf.int[1:4]
+  array_dat[5] = genes[i,1]
+  
+  # extract the log-rank p-value for the individual comparisons
+  array_dat[6] = summary(model)$sctest[3]
+  array_dat = array_dat[-2]
+  
+  forest_plot_data <- data.frame("Gene" = array_dat[4], "HR" = array_dat[1], "Lower_CI" = array_dat[2], "Upper_CI" = array_dat[3], "log_rank_p" = array_dat[5])
+  
+  results_list[[n]] <- forest_plot_data
+  n=n+1   
+  
+  p2=forest_plot_data$log_rank_p
+  
+  # plot if significant
+  if(p2 <= 0.05){
+    # plots the survival
+    
+    OS_fit <- survfit(Surv(Time_to_OS, Censor) ~ 1, data=mut_pts)
+    OS_trt_fit <- survfit(Surv(Time_to_OS, Censor) ~ hr_stratifier_vaf_text, data=mut_pts, conf.type = "log-log")
+    
+    surv_plot <- ggsurvplot(OS_trt_fit,
+                            data = mut_pts,
+                            log = (OS_trt_fit),
+                            log.rank.weights = c("survdiff"),
+                            pval = T,
+                            test.for.trend = F,
+                            pval.method.size = 3,
+                            pval.coord = c(0, 0),
+                            conf.int = F,
+                            censor = T,
+                            surv.median.line = "none",
+                            risk.table = T,
+                            risk.table.title = "",
+                            risk.table.fontsize = 4,
+                            risk.table.height = .4,
+                            risk.table.y.text = T,
+                            break.time.by = 5,
+                            risk.table.pos = c("out"),
+                            palette = c("High" = "#6A6599FF", "Low" = "#80796BFF"),
+                            xlab = "Years",
+                            ylim = c(0, 1.0),
+                            ylab =  "Survival Probability",
+                            font.main = c(15, "plain", "#252525"),
+                            pval.size = 4,
+                            font.x = c(12, "plain", "#252525"),
+                            font.y =  c(12, "plain", "#252525"),
+                            font.legend = c(12, "plain"),
+                            font.tickslab = c(12, "plain", "#252525"),
+                            legend.labs = c("0" = "High", "1" = "Low"),
+                            legend.title = paste("VAF"),
+                            legend = "right",
+                            title = gene,
+                            ggtheme = theme_cowplot()
+                            # ggtheme = theme(plot.title = element_text(hjust = 0.5))
+    )
+    
+    print(surv_plot)
+    png(filename = paste("~/Desktop/MetaAML_results/Figure_3/Supplimental/30_VAF/",gene,"_survival_by_30_VAF.png", sep = ""), res = 300, width = 4, height = 4, units = "in")
+    
+    surv_plot
+    print(surv_plot)
+    dev.off()
+  }
+}
+
+temp_final = as.data.frame(do.call(rbind, results_list))
+temp_final_median = as.data.frame(do.call(rbind, results_list_median))
+
+# plot the results for 0.3 VAF cuttoff
+temp_final$Gene <- factor(temp_final$Gene, levels = temp_final$Gene[order(temp_final$HR)])
+
+temp_final$sig_color = 0
+
+for(i in 1:nrow(temp_final)){
+  if(temp_final$log_rank_p[i] < 0.05){
+    temp_final$sig_color[i] =1
+  }
+}
+
+temp_final$sig_color = as.factor(temp_final$sig_color)
+
+temp_final$fdr = p.adjust(temp_final$log_rank_p, method = "fdr")
+
+temp_final$sig_color = as.factor(temp_final$sig_color)
+
+
+temp_final = subset(temp_final, temp_final$Upper_CI != "Inf")
+
+temp_final$p_text = NA
+temp_final$q_text = NA
+for(i in 1:nrow(temp_final)){
+  if(temp_final$log_rank_p[i] < 0.05){
+    temp_final$p_text[i] = temp_final$log_rank_p[i]
+    temp_final$q_text[i] = temp_final$fdr[i]
+  }
+}
+
+temp_final$p_text = as.numeric(temp_final$p_text)
+temp_final$q_text = as.numeric(temp_final$q_text)
+
+temp_final$p_text = round(temp_final$p_text, 3)
+temp_final$q_text = round(temp_final$q_text, 2)
+
+temp_final$p_q_text = paste("p = ", temp_final$p_text, "; q = ", temp_final$q_text, sep ="")
+temp_final$p_text = paste("p = ", temp_final$p_text)
+
+for(i in 1:nrow(temp_final)){
+  if(temp_final$log_rank_p[i] > 0.05){
+    temp_final$p_q_text[i] = ""
+  }
+  if(temp_final$log_rank_p[i] > 0.05){
+    temp_final$p_text[i] = ""
+  }
+}
+
+temp_final$HR = as.numeric(temp_final$HR)
+temp_final$Upper_CI = as.numeric(temp_final$Upper_CI)
+temp_final$Lower_CI = as.numeric(temp_final$Lower_CI)
+
+ggplot(temp_final, aes(x = reorder(Gene, -HR), y = HR, label = temp_final$p_q_text)) +
+  geom_hline(yintercept=1, linetype="dashed", color = "black") +
+  geom_hline(yintercept=2, linetype="dashed", color = "lightgrey") +
+  geom_hline(yintercept=3, linetype="dashed", color = "lightgrey") +
+  geom_text(aes(Gene, Upper_CI), hjust = 0, nudge_y = 0.1) +
+  geom_pointrange(size = 0.75, stat = "identity", shape = 19, 
+                  # fill = "white",
+                  aes(x = Gene, ymin = Lower_CI, ymax = Upper_CI, y = HR, color = sig_color)) +
+  scale_color_manual(values = c("0" = "darkgrey", "1" = "#762a83"))+
+  ylab("Hazard Ratio")+
+  theme_cowplot() +
+  ylim(0,17) +
+  theme(legend.position = "none",
+        axis.title.y=element_blank()) +
+  coord_flip() 
+
+ggsave(filename = "~/Desktop/MetaAML_results/Figure_3/Supplimental/30_VAF/gene_vaf_discrete_hr_forest_plot_de_novo_30.pdf", dpi = 300, width = 5, height = 7.5, units = "in")
+
+write.csv(temp_final, "~/Desktop/MetaAML_results/Figure_3/Supplimental/30_VAF/static_vaf_threshold_survival.csv")
+
+
+# plot the results for median VAF cuttoff
+temp_final_median$Gene <- factor(temp_final_median$Gene, levels = temp_final_median$Gene[order(temp_final_median$HR)])
+
+temp_final_median$sig_color = 0
+
+for(i in 1:nrow(temp_final_median)){
+  if(temp_final_median$log_rank_p[i] < 0.05){
+    temp_final_median$sig_color[i] =1
+  }
+}
+
+temp_final_median$sig_color = as.factor(temp_final_median$sig_color)
+
+temp_final_median$fdr = p.adjust(temp_final_median$log_rank_p, method = "fdr")
+
+temp_final_median$sig_color = as.factor(temp_final_median$sig_color)
+
+temp_final_median = subset(temp_final_median, temp_final_median$Upper_CI != "Inf")
+
+temp_final_median$categories <- reorder(temp_final_median$categories, temp_final_median$HR)
+
+temp_final_median$p_text = NA
+for(i in 1:nrow(temp_final_median)){
+  if(temp_final_median$log_rank_p[i] < 0.05){
+    temp_final_median$p_text[i] = temp_final_median$log_rank_p[i]
+  }
+}
+temp_final_median$q_text = NA
+for(i in 1:nrow(temp_final_median)){
+  if(temp_final_median$fdr[i] < 0.2){
+    temp_final_median$q_text[i] = temp_final_median$fdr[i]
+  }
+}
+
+temp_final_median$p_text = as.numeric(temp_final_median$p_text)
+temp_final_median$q_text = as.numeric(temp_final_median$q_text)
+
+temp_final_median$p_text = round(temp_final_median$p_text, 3)
+temp_final_median$q_text = round(temp_final_median$q_text, 2)
+
+for(i in 1:nrow(temp_final_median)){
+  if(temp_final_median$log_rank_p[i] < 0.01){
+    temp_final_median$p_text[i] = "p < 0.01"
+  }
+  if(temp_final_median$log_rank_p[i] >= 0.01 & temp_final_median$log_rank_p[i] <= 0.05){
+    temp_final_median$p_text[i] = paste("p = ", temp_final_median$p_text[i], sep = "")
+  }
+}
+
+for(i in 1:nrow(temp_final_median)){
+  if(temp_final_median$fdr[i] <= 0.2){
+    temp_final_median$p_q_text = paste(temp_final_median$p_text, "; q = ", temp_final_median$q_text, sep = "")
+  }
+}
+
+for(i in 1:nrow(temp_final_median)){
+  if(temp_final_median$log_rank_p[i] > 0.05){
+    temp_final_median$p_q_text[i] = ""
+  }
+  if(temp_final_median$log_rank_p[i] > 0.05){
+    temp_final_median$p_text[i] = ""
+  }
+  if(temp_final_median$fdr[i] > 0.2){
+    temp_final_median$p_q_text[i] = ""
+  }
+}
+
+
+temp_final_median$HR = as.numeric(temp_final_median$HR)
+temp_final_median$Upper_CI = as.numeric(temp_final_median$Upper_CI)
+temp_final_median$Lower_CI = as.numeric(temp_final_median$Lower_CI)
+
+ggplot(temp_final_median, aes(x = reorder(Gene, -HR), y = HR, label = temp_final_median$p_q_text)) +
+  geom_hline(yintercept=1, linetype="dashed", color = "black") +
+  geom_hline(yintercept=2, linetype="dashed", color = "lightgrey") +
+  geom_hline(yintercept=3, linetype="dashed", color = "lightgrey") +
+  geom_text(aes(Gene, Upper_CI), hjust = 0, nudge_y = 0.1) +
+  geom_pointrange(size = 0.75, stat = "identity", shape = 19, 
+                  # fill = "white",
+                  aes(x = Gene, ymin = Lower_CI, ymax = Upper_CI, y = HR, color = sig_color)) +
+  scale_color_manual(values = c("0" = "darkgrey", "1" = "#762a83"))+
+  ylab("Hazard Ratio")+
+  theme_cowplot() +
+  ylim(0,18)+
+  theme(legend.position = "none",
+        axis.title.y=element_blank()) +
+  coord_flip()
+
+ggsave(filename = "~/Desktop/MetaAML_results/Figure_3/Supplimental/Median_VAF/gene_vaf_discrete_hr_forest_plot_de_novo_median.pdf", dpi = 300, width = 5, height = 7.5, units = "in")
+
+write.csv(temp_final_median, "~/Desktop/MetaAML_results/Figure_3/Supplimental/Median_VAF/static_vaf_threshold_survival.csv")
+
+
+
+
 
 
 # VAF correlation between mutations ####

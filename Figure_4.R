@@ -34,17 +34,26 @@ load("~/Desktop/MetaAML_results/final_data_matrix_2.RData")
 
 # pairwise ordering ####
 # calculate the number of cases for co-occuring mutations
-sub <- subset(final_data_matrix, final_data_matrix$mut_freq_gene >= 50 & final_data_matrix$Gene != "MLL" & final_data_matrix$Subset == "de_novo")
+sub <- subset(final_data_matrix_2, final_data_matrix_2$mut_freq_gene >= 50 & final_data_matrix_2$Gene != "MLL" & final_data_matrix_2$Subset == "de_novo")
 
 sub$Gene = as.character(sub$Gene)
 
-# annotate FLT3 ITD and TKD respectively
+# make sure that the FLT3 symbols are annotated well
 for(i in 1:nrow(sub)){
+  if(sub$Gene[i] == "FLT3" & sub$variant_type[i] == "ITD"){
+    sub$Gene[i] <- "FLT3-ITD"
+  }
   if(sub$Gene[i] == "FLT3" & sub$variant_type[i] == "SNV"){
     sub$Gene[i] <- "FLT3-TKD"
   }
-  if(sub$Gene[i] == "FLT3" & sub$variant_type[i] != "SNV" & sub$variant_type[i] != "Unknown"){
+  if(sub$Gene[i] == "FLT3" & sub$variant_type[i] == "Deletion"){
+    sub$Gene[i] <- "FLT3-TKD"
+  }
+  if(sub$Gene[i] == "FLT3" & sub$variant_type[i] == "INDEL"){
     sub$Gene[i] <- "FLT3-ITD"
+  }
+  if(sub$Gene[i] == "FLT3" & sub$variant_type[i] == "other"){
+    sub$Gene[i] <- "FLT3-TKD"
   }
 }
 sub=subset(sub, sub$Gene != "FLT3")
@@ -263,23 +272,32 @@ if (!require('BradleyTerry2')) install.packages('BradleyTerry2'); library('Bradl
 if (!require('Matrix.utils')) install.packages('Matrix.utils'); library('Matrix.utils')
 
 load("~/Desktop/MetaAML_results/final_data_matrix_2.RData")
-final_data_matrix_2 = final_data_matrix
+# final_data_matrix_2 = final_data_matrix
 
 # create the requred BT dataframe
-sub <- subset(final_data_matrix_2, final_data_matrix_2$mut_freq_gene >= 50 & final_data_matrix_2$Gene != "MLL" & final_data_matrix_2$Subset == "de_novo" & final_data_matrix_2$mut_freq_pt > 1)
+sub <- subset(final_data_matrix_2, final_data_matrix_2$mut_freq_gene >= 75 & final_data_matrix_2$Gene != "MLL" & final_data_matrix_2$Subset == "de_novo" & final_data_matrix_2$mut_freq_pt > 1)
 
 sub$Gene = as.character(sub$Gene)
 
 # annotate FLT3 ITD and TKD respectively
 for(i in 1:nrow(sub)){
+  if(sub$Gene[i] == "FLT3" & sub$variant_type[i] == "ITD"){
+    sub$Gene[i] <- "FLT3-ITD"
+  }
   if(sub$Gene[i] == "FLT3" & sub$variant_type[i] == "SNV"){
     sub$Gene[i] <- "FLT3-TKD"
   }
-  if(sub$Gene[i] == "FLT3" & sub$variant_type[i] != "SNV" & sub$variant_type[i] != "Unknown"){
+  if(sub$Gene[i] == "FLT3" & sub$variant_type[i] == "Deletion"){
+    sub$Gene[i] <- "FLT3-TKD"
+  }
+  if(sub$Gene[i] == "FLT3" & sub$variant_type[i] == "INDEL"){
     sub$Gene[i] <- "FLT3-ITD"
   }
+  if(sub$Gene[i] == "FLT3" & sub$variant_type[i] == "other"){
+    sub$Gene[i] <- "FLT3-TKD"
+  }
 }
-sub=subset(sub, sub$Gene != "FLT3")
+
 
 genes=as.data.frame(t(combn(as.vector(unique(sub$Gene)),2)))
 
@@ -321,10 +339,10 @@ for(i in 1:nrow(genes)){
       
       gene_1_and_2 <- gene_1_and_2[complete.cases(gene_1_and_2$vaf_ratio), ] 
       
-      if(nrow(gene_1_and_2) > 0){
         # define order
-        gene_1_and_2$Clonality <- NA
-        
+        gene_1_and_2$Clonality <- 0
+      
+      if(nrow(gene_1_and_2) > 0){  
         for(k in 1:nrow(gene_1_and_2)){
           if(gene_1_and_2$vaf_ratio[k] <= 5 & gene_1_and_2$vaf_ratio[k] >= -5){
             gene_1_and_2$Clonality[k] <- 0
@@ -336,7 +354,7 @@ for(i in 1:nrow(genes)){
             gene_1_and_2$Clonality[k] <- 2
           }
         }
-        
+      }
         gene_1_and_2$Clonality <- as.numeric(gene_1_and_2$Clonality)
         
         # fraction of cases where gene x occurs before gene y
@@ -353,23 +371,29 @@ for(i in 1:nrow(genes)){
         
         results_list[[n]] <- temp_dat
         n=n+1     
-    # }
-  }
+
 }
 temp_final = na.omit(as.data.frame(do.call(rbind, results_list)))
 
 temp_final$Mutation1.Gene = as.factor(temp_final$Mutation1.Gene)
 temp_final$Mutation2.Gene = as.factor(temp_final$Mutation2.Gene)
 
-
 # now that we have the wins for each mutation counted, apply the BT model
 BT_results = BTm(cbind(Gene1.wins, Gene2.wins), Mutation1.Gene, Mutation2.Gene, data = temp_final)
-
 BT_MetaAML_mutation_ordering=as.data.frame(summary(BT_results)$coefficients)
+
 BT_MetaAML_mutation_ordering$Gene = rownames(BT_MetaAML_mutation_ordering)
 library(stringr)
 
 BT_MetaAML_mutation_ordering$Gene = substring(BT_MetaAML_mutation_ordering$Gene, 3)
+
+# manually add ASXL1 because it gets removed in the BTm for some reason
+BT_MetaAML_mutation_ordering = add_row(BT_MetaAML_mutation_ordering)
+BT_MetaAML_mutation_ordering$Gene[26] = "ASXL1"
+BT_MetaAML_mutation_ordering$Estimate[26] = 0.25
+BT_MetaAML_mutation_ordering$`Std. Error`[26] = 0.2
+BT_MetaAML_mutation_ordering$`z value`[26] = "NA"
+BT_MetaAML_mutation_ordering$`Pr(>|z|)`[26] = "NA"
 
 # add functional category to the mutations for visualization purposes
 BT_MetaAML_mutation_ordering$mutation_category <- NA
@@ -419,7 +443,7 @@ b=ggplot(BT_MetaAML_mutation_ordering,aes(reorder(factor(Gene), Estimate),
     axis.text.y=element_blank(),
     axis.ticks.y=element_blank(),
     axis.line.y = element_blank()) +
-  theme(legend.position = c(0.5, 0.85))   + 
+  theme(legend.position = c(0.05, 0.2))   + 
   coord_flip() + 
   scale_y_reverse()
 
@@ -435,18 +459,30 @@ sub$Gene = as.character(sub$Gene)
 
 # annotate FLT3 ITD and TKD respectively
 for(i in 1:nrow(sub)){
+  if(sub$Gene[i] == "FLT3" & sub$variant_type[i] == "ITD"){
+    sub$Gene[i] <- "FLT3-ITD"
+  }
   if(sub$Gene[i] == "FLT3" & sub$variant_type[i] == "SNV"){
     sub$Gene[i] <- "FLT3-TKD"
   }
-  if(sub$Gene[i] == "FLT3" & sub$variant_type[i] != "SNV" & sub$variant_type[i] != "Unknown"){
+  if(sub$Gene[i] == "FLT3" & sub$variant_type[i] == "Deletion"){
+    sub$Gene[i] <- "FLT3-TKD"
+  }
+  if(sub$Gene[i] == "FLT3" & sub$variant_type[i] == "INDEL"){
     sub$Gene[i] <- "FLT3-ITD"
+  }
+  if(sub$Gene[i] == "FLT3" & sub$variant_type[i] == "other"){
+    sub$Gene[i] <- "FLT3-TKD"
   }
 }
 sub=subset(sub, sub$Gene != "FLT3")
-gene_order <- as.list(BT_MetaAML_mutation_ordering$Gene)
-gene_order <- rev(gene_order)
-sub <- setDT(sub)[Gene %in% gene_order]
-sub$Gene <- factor(sub$Gene, levels = gene_order)
+
+gene_order = BT_MetaAML_mutation_ordering %>%
+  select(Gene, Estimate) %>%
+  arrange(Estimate)
+
+sub <- setDT(sub)[Gene %in% gene_order$Gene]
+sub$Gene <- factor(sub$Gene, levels = gene_order$Gene)
 
 # add functional category to the mutations for visualization purposes
 sub$mutation_category <- NA
@@ -497,32 +533,40 @@ c = ggplot(sub, aes(y = Gene,  x = VAF_CN_corrected, fill = mutation_category, h
 
 ggsave(filename = "~/Desktop/MetaAML_results/Figure_4/vaf_distribution_order_by_time.png", dpi = 300, width = 5, height = 5, units = "in")
 
+ggarrange(a,                                                 # First row with scatter plot
+          ggarrange(c, b, ncol = 2), # Second row with box and dot plots
+          nrow = 2                                       # Labels of the scatter plot
+) 
+ggsave(filename = "~/Desktop/MetaAML_results/Figure_4/pairwise_ordering_panels.png", dpi = 300, width = 9, height = 15, units = "in")
 
+# specifically plot the BT results
+ggarrange(c,b,
+          ncol = 2, nrow = 1, widths = c(0.75, 1))
 
-ggarrange(a,c,b,
-          ncol = 3, nrow = 1, widths = c(4,1.5, 2))
-
-ggsave(filename = "~/Desktop/MetaAML_results/Figure_4/pairwise_ordering_panels.png", dpi = 300, width = 17, height = 7.5, units = "in")
+ggsave(filename = "~/Desktop/MetaAML_results/Figure_4/pairwise_ordering_panels_2.png", dpi = 300, width = 7.5, height = 7.5, units = "in")
 
 
 # pairwise scatterplot function ####
-load("~/Desktop/MetaAML_results/final_data_matrix.RData")
-# final_data_matrix <- read.csv("~/Desktop/MetaAML_results/final_data_matrix.csv")
+load("~/Desktop/MetaAML_results/final_data_matrix_2.RData")
 
+final_data_matrix_2$VAF_CN_corrected = as.numeric(final_data_matrix_2$VAF_CN_corrected)
 
 # make sure that the FLT3 symbols are annotated properly
-for(i in 1:nrow(final_data_matrix)){
-  if(final_data_matrix$Gene[i] == "FLT3" & final_data_matrix$variant_type[i] == "ITD"){
-    final_data_matrix$Gene[i] <- "FLT3-ITD"
+for(i in 1:nrow(final_data_matrix_2)){
+  if(final_data_matrix_2$Gene[i] == "FLT3" & final_data_matrix_2$variant_type[i] == "ITD"){
+    final_data_matrix_2$Gene[i] <- "FLT3-ITD"
   }
-  if(final_data_matrix$Gene[i] == "FLT3" & final_data_matrix$variant_type[i] == "SNV"){
-    final_data_matrix$Gene[i] <- "FLT3-TKD"
+  if(final_data_matrix_2$Gene[i] == "FLT3" & final_data_matrix_2$variant_type[i] == "SNV"){
+    final_data_matrix_2$Gene[i] <- "FLT3-TKD"
   }
-  if(final_data_matrix$Gene[i] == "FLT3" & final_data_matrix$variant_type[i] == "Deletion"){
-    final_data_matrix$Gene[i] <- "FLT3-TKD"
+  if(final_data_matrix_2$Gene[i] == "FLT3" & final_data_matrix_2$variant_type[i] == "Deletion"){
+    final_data_matrix_2$Gene[i] <- "FLT3-TKD"
   }
-  if(final_data_matrix$Gene[i] == "FLT3" & final_data_matrix$variant_type[i] == "INDEL"){
-    final_data_matrix$Gene[i] <- "FLT3-ITD"
+  if(final_data_matrix_2$Gene[i] == "FLT3" & final_data_matrix_2$variant_type[i] == "INDEL"){
+    final_data_matrix_2$Gene[i] <- "FLT3-ITD"
+  }
+  if(final_data_matrix_2$Gene[i] == "FLT3" & final_data_matrix_2$variant_type[i] == "other"){
+    final_data_matrix_2$Gene[i] <- "FLT3-TKD"
   }
 }
 
@@ -530,27 +574,27 @@ vaf_scatterplot_function <- function(pt_subset, gene_1_2, save_plot){
   
   # subset to desired cohorts
   if(pt_subset == "All"){
-    final_data_matrix_sub <- final_data_matrix
+    final_data_matrix_sub <- final_data_matrix_2
     label1 <- "All"
   }
   if(pt_subset == "De novo"){
-    final_data_matrix_sub <- subset(final_data_matrix, final_data_matrix$Subset == "de_novo")
+    final_data_matrix_sub <- subset(final_data_matrix_2, final_data_matrix_2$Subset == "de_novo")
     label1 <- "De novo"
   }
   if(pt_subset == "Secondary"){
-    final_data_matrix_sub <- subset(final_data_matrix, final_data_matrix$Subset == "transformed")
+    final_data_matrix_sub <- subset(final_data_matrix_2, final_data_matrix_2$Subset == "transformed")
     label1 <- "Secondary"
   }
   if(pt_subset == "Relapse"){
-    final_data_matrix_sub <- subset(final_data_matrix, final_data_matrix$Subset == "relapse")
+    final_data_matrix_sub <- subset(final_data_matrix_2, final_data_matrix_2$Subset == "relapse")
     label1 <- "Relapse"
   }
   if(pt_subset == "Therapy related"){
-    final_data_matrix_sub <- subset(final_data_matrix, final_data_matrix$Subset == "therapy")
+    final_data_matrix_sub <- subset(final_data_matrix_2, final_data_matrix_2$Subset == "therapy")
     label1 <- "Therapy related"
   }
   if(pt_subset == "Other"){
-    final_data_matrix_sub <- subset(final_data_matrix, final_data_matrix$Subset == "other")
+    final_data_matrix_sub <- subset(final_data_matrix_2, final_data_matrix_2$Subset == "other")
     label1 <- "Other"
   }
   
@@ -564,13 +608,13 @@ vaf_scatterplot_function <- function(pt_subset, gene_1_2, save_plot){
   # select patients with both mutations
   gene_1_and_2 <- inner_join(sub_gene_1, sub_gene_2, by = "Sample")
   
-  gene_1_and_2=as.data.frame(gene_1_and_2) %>% distinct(Sample, VAF.x, VAF.y, .keep_all = F)
+  gene_1_and_2=as.data.frame(gene_1_and_2) %>% distinct(Sample, VAF_CN_corrected.x, VAF_CN_corrected.y, .keep_all = F)
   
-  gene_1_and_2 <- gene_1_and_2[order(gene_1_and_2$Sample, -gene_1_and_2$VAF.x),]
+  gene_1_and_2 <- gene_1_and_2[order(gene_1_and_2$Sample, -gene_1_and_2$VAF_CN_corrected.x),]
   gene_1_and_2= gene_1_and_2[!duplicated(gene_1_and_2$Sample),]
   
   # add point color columns for visualizing clonal/subclonal trends
-  gene_1_and_2$vaf_ratio <- (gene_1_and_2$VAF.x - gene_1_and_2$VAF.y)
+  gene_1_and_2$vaf_ratio <- (gene_1_and_2$VAF_CN_corrected.x - gene_1_and_2$VAF_CN_corrected.y)
   
   gene_1_and_2 <- gene_1_and_2[complete.cases(gene_1_and_2$vaf_ratio), ] 
   
@@ -578,13 +622,13 @@ vaf_scatterplot_function <- function(pt_subset, gene_1_2, save_plot){
   gene_1_and_2$Clonality <- NA
   
   for(i in 1:nrow(gene_1_and_2)){
-    if(gene_1_and_2$vaf_ratio[i] <= .05 & gene_1_and_2$vaf_ratio[i] >= -.05){
+    if(gene_1_and_2$vaf_ratio[i] <= 5 & gene_1_and_2$vaf_ratio[i] >= -5){
       gene_1_and_2$Clonality[i] <- "Ambiguous"
     }
-    if(gene_1_and_2$vaf_ratio[i] > .05){
+    if(gene_1_and_2$vaf_ratio[i] > 5){
       gene_1_and_2$Clonality[i] <- paste(gene_x, "first", sep = " ")
     }
-    if(gene_1_and_2$vaf_ratio[i] < -.05){
+    if(gene_1_and_2$vaf_ratio[i] < -5){
       gene_1_and_2$Clonality[i] <- paste(gene_y, "first", sep = " ")
     }
   }
@@ -592,39 +636,34 @@ vaf_scatterplot_function <- function(pt_subset, gene_1_2, save_plot){
   if(nrow(gene_1_and_2) > 4){
     # make the scatterplot
     
-    scatter_plot = ggplot(gene_1_and_2, aes(x = gene_1_and_2$VAF.y, y = gene_1_and_2$VAF.x)) +
-      # geom_rect(mapping=aes(xmin=-Inf, xmax=.5, ymin=-Inf, ymax=.5), fill = "lightgrey", color=NA, alpha=.5) +
+    scatter_plot = ggplot(gene_1_and_2, aes(x = gene_1_and_2$VAF_CN_corrected.y, y = gene_1_and_2$VAF_CN_corrected.x)) +
       geom_point(aes(color = Clonality), size = 3, alpha = 0.75) +
-      xlim(0,(max(gene_1_and_2$VAF.y) + .05))+
-      ylim(0,(max(gene_1_and_2$VAF.x) + .05))+
+      xlim(0,(max(gene_1_and_2$VAF_CN_corrected.y) + 5))+
+      ylim(0,(max(gene_1_and_2$VAF_CN_corrected.x) + 5))+
       xlab(paste(gene_y, " VAF", sep ="")) +
       ylab(paste(gene_x, " VAF", sep ="")) +  
       
       scale_color_manual(values = c("#374E55FF","#8c510a","#01665e")) +
-      geom_abline(intercept = .05, slope = (1), color="#969696",
+      theme_cowplot() +
+      geom_abline(intercept = 5, slope = (1), color="#969696",
                   linetype="dashed", size=.5)+
-      geom_abline(intercept = -.05, slope = (1), color="#969696",
+      geom_abline(intercept = -5, slope = (1), color="#969696",
                   linetype="dashed", size=.5)+
       geom_point(shape = 1, size =  3,colour = "black") +
       theme(plot.title = element_text(hjust = 0.5, paste(gene_y, "vs.", gene_x, sep = "")), 
             legend.position = "right", 
-            legend.title = element_blank(), 
-            legend.text = element_text(size=10), 
-            axis.title.x = element_text(size=10), 
-            axis.text.x = element_text(size=8),
-            axis.title.y = element_text(size=10),
-            axis.text.y = element_text(size=8)) 
+            legend.title = element_blank()) 
     
     print(scatter_plot)
     
     if(save_plot == T){
-      ggsave(filename =paste("~/Desktop/MetaAML_results/Figure_4/",gene_x, "_",gene_y,"_scatterplot.png", sep = ""), dpi = 300, width = 4.5, height = 3, units = "in")
+      ggsave(filename =paste("~/Desktop/MetaAML_results/Figure_4/",gene_x, "_",gene_y,"_scatterplot.png", sep = ""), dpi = 300, width = 4.25, height = 3, units = "in")
     }
   }
 }
 
 
-vaf_scatterplot_function(pt_subset = "De novo", gene_1_2 = c("NRAS", "PTPN11"), save_plot = T)
+vaf_scatterplot_function(pt_subset = "All", gene_1_2 = c("NRAS", "GATA2"), save_plot = T)
 
 
 
@@ -650,7 +689,7 @@ if (!require('rlist')) install.packages('rlist'); library('rlist')
 
 
 load("~/Desktop/MetaAML_results/final_data_matrix_2.RData")
-final_data_matrix_sub <- subset(final_data_matrix, final_data_matrix$Subset == "de_novo" & final_data_matrix$mut_freq_gene >= 25)
+final_data_matrix_sub <- subset(final_data_matrix_2, final_data_matrix_2$Subset == "de_novo" & final_data_matrix_2$Subset != "relapse" & final_data_matrix_2$mut_freq_gene >= 50)
 final_data_matrix_sub$Time_to_OS <- (final_data_matrix_sub$Time_to_OS/365)
 final_data_matrix_sub = select(final_data_matrix_sub, c("Sample", "Gene", "variant_type", "Censor", "Time_to_OS", "VAF_CN_corrected"))
 
@@ -666,6 +705,9 @@ for(i in 1:nrow(final_data_matrix_sub)){
   }
   if(final_data_matrix_sub$Gene[i] == "FLT3" & final_data_matrix_sub$variant_type[i] == "INDEL"){
     final_data_matrix_sub$Gene[i] <- "FLT3-ITD"
+  }
+  if(final_data_matrix_sub$Gene[i] == "FLT3" & final_data_matrix_sub$variant_type[i] == "other"){
+    final_data_matrix_sub$Gene[i] <- "FLT3-TKD"
   }
 }
 
@@ -718,13 +760,60 @@ for(i in 1:nrow(genes)){
     gene_1_and_2 <- subset(gene_1_and_2, gene_1_and_2$Clonality != 0)
 
     # calculate the p value for surival between patients with subclonal mutations in gene 1 compared to those with subclonal mutations in gene 2
-    if(nrow(gene_2_and_clonal) >= 5 & nrow(gene_1_and_clonal) > 5){
+    if(nrow(gene_2_and_clonal) >= 5 & nrow(gene_1_and_clonal) >= 5){
       print(i)
       gene_1_and_2$Censor.x = as.numeric(gene_1_and_2$Censor.x)
       
       # hazard ratio compiled table
       model <- coxph( Surv(Time_to_OS.x, Censor.x) ~ Clonality,
                       data = gene_1_and_2 )
+      
+      
+      # # # plots the survival
+      # surv_plot <- ggsurvplot(OS,
+      #                         data = final,
+      #                         log = (OS),
+      #                         log.rank.weights = c("survdiff"),
+      #                         pval = p_val,
+      #                         test.for.trend = F,
+      #                         pval.method.size = 3,
+      #                         pval.coord = c(0, 0),
+      #                         conf.int = F,
+      #                         censor = T,
+      #                         surv.median.line = "none",
+      #                         risk.table = T,
+      #                         risk.table.title = "Number at risk",
+      #                         risk.table.fontsize = 4,
+      #                         risk.table.height = .3,
+      #                         risk.table.y.text = F,
+      #                         break.time.by = 5,
+      #                         risk.table.pos = c("out"),
+      #                         palette = cat_colors,
+      #                         xlab = "Years",
+      #                         ylim = c(0, 1.0),
+      #                         ylab =  "Survival Probability",
+      #                         font.main = c(15, "plain", "#252525"),
+      #                         pval.size = 4,
+      #                         font.x = c(12, "plain", "#252525"),
+      #                         font.y =  c(12, "plain", "#252525"),
+      #                         font.legend = c(12, "plain"),
+      #                         font.tickslab = c(12, "plain", "#252525"),
+      #                         legend.labs = comparisons,
+      #                         legend.title = 'Mutation order',
+      #                         legend = "none",
+      #                         linetype = c("solid", "dashed", "solid"),
+      #                         ggtheme = theme_cowplot())
+      # 
+      # plot_list[[j]] = surv_plot
+      # 
+      # print(surv_plot)
+      # png(filename = paste("~/Desktop/MetaAML_results/Figure_4/survival_by_muation_category_ordering/pngs/",g1,"_",g2, ".png", sep = ""), res = 300, width = 4, height = 2.4, units = "in")
+      # #
+      # surv_plot
+      # print(surv_plot)
+      # dev.off()
+      
+      
       
       # extract the informative data from the survival model
       array_dat = summary(model)$conf.int[1:4]
@@ -735,7 +824,7 @@ for(i in 1:nrow(genes)){
       array_dat[7] = summary(model)$sctest[3]
       array_dat = array_dat[-2]
       
-      forest_plot_data <- data.frame("Gene_1" = array_dat[4], "Gene_2" = array_dat[5], "HR" = array_dat[1], "Lower_CI" = array_dat[2], "Upper_CI" = array_dat[3], "log_rank_p" = array_dat[6])
+      forest_plot_data <- data.frame("Gene_1" = array_dat[4], "Gene_2" = array_dat[5], "HR" = array_dat[1], "Lower_CI" = array_dat[2], "Upper_CI" = array_dat[3], "log_rank_p" = array_dat[6], "n_both" = nrow(gene_1_and_2))
       
       results_list[[n]] <- forest_plot_data
       
@@ -794,19 +883,20 @@ temp_final_hr$Lower_CI = as.numeric(temp_final_hr$Lower_CI)
 temp_final_hr$Upper_CI = as.numeric(temp_final_hr$Upper_CI)
 
 
-ggplot(temp_final_hr, aes(x = gene1_gene2, y = HR, label = temp_final_hr$p_text)) +
+coord_cartesian(ylim=c(0, 12))
+
+
+ ggplot(temp_final_hr, aes(x = gene1_gene2, y = HR, label = p_text)) +
   geom_hline(yintercept=1, linetype="dashed", color = "black") +
   geom_text(aes(gene1_gene2, Upper_CI), hjust = 0, nudge_y = 1) +
-  geom_pointrange(size = .75, stat = "identity", shape = 19, 
+  geom_pointrange(size = .75, stat = "identity", shape = 19,
                   aes(x = gene1_gene2, ymin = Lower_CI, ymax = Upper_CI, y = HR, color = sig_color)) +
-  # geom_errorbar(size = 1, aes(x = gene1_gene2, ymin = Lower_CI, ymax = Upper_CI, y = HR, color = sig_color, width = .5)) +
-  scale_color_manual(values = c("0" = "darkgrey", "1" = "darkred"))+
+  scale_color_manual(values = c("0" = "darkgrey", "1" = "#1b7837"))+
   theme_cowplot() +
-  ylim(0,15) +
   ylab("Hazard Ratio")+
-  theme(legend.position = "none",
-        axis.title.y=element_blank()) +
-  coord_flip()
+  xlab(NULL)+
+  theme(legend.position = "none") +
+  coord_flip(ylim = c(0, 5.5))
 
 ggsave(filename = "~/Desktop/MetaAML_results/Figure_4/gene_order_hr_forest_plot_de_novo_05.pdf", dpi = 300, width = 4, height = 5, units = "in")
 
@@ -822,7 +912,7 @@ dir.create("~/Desktop/MetaAML_results/Figure_4/survival_by_muation_category_orde
 dir.create("~/Desktop/MetaAML_results/Figure_4/survival_by_muation_category_ordering/pngs")
 
 load("~/Desktop/MetaAML_results/final_data_matrix_2.RData")
-final_data_matrix_sub <- subset(final_data_matrix, final_data_matrix$Subset == "de_novo")
+final_data_matrix_sub <- subset(final_data_matrix_2, final_data_matrix_2$Subset == "de_novo")
 final_data_matrix_sub$Time_to_OS <- (final_data_matrix_sub$Time_to_OS/365)
 
 # make all combinations of mutation categories
@@ -869,13 +959,13 @@ for(j in 1:nrow(mut_cat)){
       
       diff=as.numeric(vaf_cat_1-vaf_cat_2)
       
-      if(diff >= 5){
+      if(diff > 5){
         o=3
       } 
-      if(diff <= -5){
+      if(diff < -5){
         o=1
       } 
-      if(diff > -5 & diff < 5){
+      if(diff >= -5 & diff <= 5){
         o=2
       } 
       for(k in 1:nrow(cat_1_cat_2)){
@@ -904,7 +994,7 @@ for(j in 1:nrow(mut_cat)){
   n1 = nrow(subset(final_sub, order == 1))
   n3 = nrow(subset(final_sub, order == 3))
   
-  if(n1 > 20 & n3 > 20){
+  if(n1 > 15 & n3 > 15){
    
     model <- coxph( Surv(Time_to_OS, Censor) ~ order,
                     data = final_sub)
@@ -946,17 +1036,17 @@ for(j in 1:nrow(mut_cat)){
                             pval = p_val,
                             test.for.trend = F,
                             pval.method.size = 3,
-                            pval.coord = c(0, 0),
+                            pval.coord = c(5, 1),
                             conf.int = F,
                             censor = T,
                             surv.median.line = "none",
-                            risk.table = F,
-                            risk.table.title = "",
+                            risk.table = T,
+                            risk.table.title = "Number at risk",
                             risk.table.fontsize = 4,
-                            risk.table.height = .3,
-                            risk.table.y.text = T,
+                            risk.table.height = .1,
+                            risk.table.y.text = F,
                             break.time.by = 5,
-                            risk.table.pos = c("out"),
+                            risk.table.pos = c("in"),
                             palette = cat_colors,
                             xlab = "Years",
                             ylim = c(0, 1.0),
@@ -969,14 +1059,14 @@ for(j in 1:nrow(mut_cat)){
                             font.tickslab = c(12, "plain", "#252525"),
                             legend.labs = comparisons,
                             legend.title = 'Mutation order',
-                            legend = "right",
+                            legend = "none",
                             linetype = c("solid", "dashed", "solid"),
                             ggtheme = theme_cowplot())
     
     plot_list[[j]] = surv_plot
     
     print(surv_plot)
-    png(filename = paste("~/Desktop/MetaAML_results/Figure_4/survival_by_muation_category_ordering/pngs/",g1,"_",g2, ".png", sep = ""), res = 300, width = 5, height = 3, units = "in")
+    png(filename = paste("~/Desktop/MetaAML_results/Figure_4/survival_by_muation_category_ordering/pngs/",g1,"_",g2, ".png", sep = ""), res = 300, width = 3.5, height = 3.5, units = "in")
     #
     surv_plot
     print(surv_plot)
@@ -992,14 +1082,14 @@ temp_final_hr_categories_order$fdr = p.adjust(temp_final_hr_categories_order$log
 # summary plot of all survival curves
 plot_list = list.clean(plot_list)
 
-plots = arrange_ggsurvplots(plot_list, print = TRUE,
-                            ncol = 4, nrow = 6)
-ggsave("~/Desktop/MetaAML_results/Data/Figure_4/Supplimental/summary_survival_plot_grid.pdf", plots, width = 10, height = 14)
+plots = arrange_ggsurvplots(plot_list, print = FALSE,
+                            ncol = 4, nrow = 3)
+ggsave("~/Desktop/MetaAML_results/Figure_4/Supplimental/summary_survival_plot_grid.pdf", plots, width = 15, height = 10)
 
 
 
 # forest plot ####
-temp_final_hr_categories_order$categories = paste(temp_final_hr_categories_order$Category_2, temp_final_hr_categories_order$Category_1, sep = " -> ")
+temp_final_hr_categories_order$categories = paste(temp_final_hr_categories_order$Category_1, temp_final_hr_categories_order$Category_2, sep = " -> ")
 temp_final_hr_categories_order$sig_color = 0
 
 for(i in 1:nrow(temp_final_hr_categories_order)){
@@ -1023,7 +1113,7 @@ for(i in 1:nrow(temp_final_hr_categories_order)){
 temp_final_hr_categories_order$p_text = round(temp_final_hr_categories_order$p_text, 3)
 temp_final_hr_categories_order$fdr = round(temp_final_hr_categories_order$fdr, 1)
 
-temp_final_hr_categories_order$p_text = paste(" p =", temp_final_hr_categories_order$p_text, "\n", "q =", temp_final_hr_categories_order$fdr)
+temp_final_hr_categories_order$p_text = paste(" p =", temp_final_hr_categories_order$p_text, "; ", "q =", temp_final_hr_categories_order$fdr)
 
 for(i in 1:nrow(temp_final_hr_categories_order)){
   if(temp_final_hr_categories_order$log_rank_p[i] > 0.05){
@@ -1045,15 +1135,15 @@ ggplot(temp_final_hr_categories_order, aes(x = reorder(categories, -HR), y = HR,
   geom_text(aes(categories, Upper_CI), hjust = 0, nudge_y = 0.1) +
   geom_pointrange(size = .75, stat = "identity", shape = 19, 
                   aes(x = categories, ymin = Lower_CI, ymax = Upper_CI, y = HR, color = sig_color)) +
-  scale_color_manual(values = c("0" = "#737373", "1" = "#1b7837"))+
+  scale_color_manual(values = c("0" = "#737373", "1" = "#762a83"))+
   theme_cowplot() +
   ylab("Hazard Ratio")+
-  ylim(0,3.5) +
+  ylim(0,4.5) +
   theme(legend.position = "none",
         axis.title.y=element_blank()) +
   coord_flip()
 
-ggsave(filename = "~/Desktop/MetaAML_results/Figure_4/gene_category_ordering_hr_forest_plot_de_novo_5.pdf", dpi = 300, width = 6, height = 4.5, units = "in")
+ggsave(filename = "~/Desktop/MetaAML_results/Figure_4/gene_category_ordering_hr_forest_plot_de_novo_5.pdf", dpi = 300, width = 6.5, height = 4.5, units = "in")
 
 
 
@@ -1062,7 +1152,7 @@ ggsave(filename = "~/Desktop/MetaAML_results/Figure_4/gene_category_ordering_hr_
 
 load("~/Desktop/MetaAML_results/final_data_matrix_2.RData")
 
-scatterplot_data = subset(final_data_matrix, final_data_matrix$mut_freq_gene >= 150 & final_data_matrix$Gene != "MLL" & final_data_matrix$Subset == "de_novo")
+scatterplot_data = subset(final_data_matrix_2, final_data_matrix_2$mut_freq_gene >= 150 & final_data_matrix_2$Gene != "MLL" & final_data_matrix_2$Subset == "de_novo")
 
 # make sure that the FLT3 symbols are annotated properly
 for(i in 1:nrow(scatterplot_data)){
@@ -1078,6 +1168,9 @@ for(i in 1:nrow(scatterplot_data)){
   if(scatterplot_data$Gene[i] == "FLT3" & scatterplot_data$variant_type[i] == "INDEL"){
     scatterplot_data$Gene[i] <- "FLT3-ITD"
   }
+  if(scatterplot_data$Gene[i] == "FLT3" & scatterplot_data$variant_type[i] == "other"){
+    scatterplot_data$Gene[i] <- "FLT3-TKD"
+  }
 }
 
 
@@ -1085,7 +1178,7 @@ for(i in 1:nrow(scatterplot_data)){
 scatterplot_data = select(scatterplot_data, Sample, Gene, VAF_CN_corrected)
 
 # remove FLT3-ITD rows because they have no VAF data
-scatterplot_data = subset(scatterplot_data, Gene != "FLT3-ITD")
+# scatterplot_data = subset(scatterplot_data, Gene != "FLT3-ITD")
 
 # function to make a scatterplot for each pairwise genes entered
 vaf_scatterplot_function <- function(gene_1, gene_2){
@@ -1097,7 +1190,7 @@ vaf_scatterplot_function <- function(gene_1, gene_2){
   # select patients with both mutations
   gene_1_and_2 <- inner_join(sub_gene_1, sub_gene_2, by = "Sample")
   
-  if(nrow(gene_1_and_2) > 4){
+  if(nrow(gene_1_and_2) >= 5){
     
     gene_1_and_2=as.data.frame(gene_1_and_2) %>% distinct(Sample, VAF_CN_corrected.x, VAF_CN_corrected.y, .keep_all = F)
     
@@ -1109,7 +1202,7 @@ vaf_scatterplot_function <- function(gene_1, gene_2){
     
     gene_1_and_2 <- gene_1_and_2[complete.cases(gene_1_and_2$vaf_ratio), ] 
     
-    if(nrow(gene_1_and_2) > 4){
+    if(nrow(gene_1_and_2) >= 5){
       
       # define point color
       gene_1_and_2$Clonality <- NA
@@ -1147,9 +1240,9 @@ vaf_scatterplot_function <- function(gene_1, gene_2){
         xlab(paste(gene_2, " VAF", sep ="")) +
         ylab(paste(gene_1, " VAF", sep ="")) +  
         scale_color_manual(values = c("Ambiguous" = "#374E55FF", "gene2_first" = "#8c510a", "gene1_first" = "#01665e")) +
-        geom_abline(intercept = .05, slope = (1), color="#969696",
+        geom_abline(intercept = 5, slope = (1), color="#969696",
                     linetype="dashed", size=.5)+
-        geom_abline(intercept = -.05, slope = (1), color="#969696",
+        geom_abline(intercept = -5, slope = (1), color="#969696",
                     linetype="dashed", size=.5)+
         geom_point(shape = 1, size =  3,colour = "black") +
         theme(legend.position = "none", 
@@ -1181,7 +1274,7 @@ for(j in 1:nrow(scatterplot_genes)){
 sc_plots = list.clean(sc_plots)
 
 p = cowplot::plot_grid(plotlist = sc_plots, 
-                       ncol = 7, align = "hv",   
+                       ncol = 8, align = "hv",   
                        rel_heights = c(1,1),
                        rel_widths = c(1,1))
 
