@@ -1,45 +1,26 @@
 # ========================================================================================================================================== #
 # Figure_2.R
 # Author : Brooks Benard, bbenard@stanford.edu
-# Date: 03/16/2021
+# Date: 08/23/2021
 # Description: This script will perform survival and mutation co-occurence analyses as seen in Figure 2 and related suppliments of the manuscript Benard et al. "Clonal architecture and variant allele frequency correlate with clinical outcomes and drug response in acute myeloid leukemia".
 # ========================================================================================================================================== #
 
-# ============== #
-# Load libraries #
-# ============== #
-if (!require('ggplot2')) install.packages('ggplot2'); library('ggplot2')
-if (!require('tydyr')) install.packages('tydyr', dependencies = TRUE); library('tydyr')
-if (!require('dplyr')) install.packages('dplyr', dependencies = TRUE); library('dplyr')
-if (!require('cometExactTest')) install.packages('cometExactTest', dependencies = TRUE); library('cometExactTest')
-if (!require('discover')) install.packages('discover'); library('discover')
-if (!require('stringr')) install.packages('stringr'); library('stringr')
-if (!require('maditr')) install.packages('maditr'); library('maditr')
-if (!require('reshape2')) install.packages('reshape2'); library('reshape2')
-if (!require('data.table')) install.packages('data.table'); library('data.table')
-if (!require('epitools')) install.packages('epitools'); library('epitools')
-if (!require('corrplot')) install.packages('corrplot'); library('corrplot')
-if (!require('RColorBrewer')) install.packages('RColorBrewer'); library('RColorBrewer')
-if (!require('rlist')) install.packages('rlist'); library('rlist')
-if (!require('readxl')) install.packages('readxl'); library('readxl')
-if (!require('cowplot')) install.packages('cowplot'); library('cowplot')
-if (!require('plyr')) install.packages('plyr'); library('plyr')
-if (!require('muhaz')) install.packages('muhaz'); library('muhaz')
-if (!require('data.table')) install.packages('data.table'); library('data.table')
-if (!require('ggpubr')) install.packages('ggpubr'); library('ggpubr')
-if (!require('muhaz')) install.packages('muhaz'); library('muhaz')
-if (!require('survival')) install.packages('survival'); library('survival')
-if (!require('survivalAnalysis')) install.packages('survivalAnalysis', dependencies = TRUE); library('survivalAnalysis')
-if (!require('survMisc')) install.packages('survMisc'); library('survMisc')
-if (!require('survminer')) install.packages('survminer'); library('survminer')
-if (!require('ggsci')) install.packages('ggsci'); library('ggsci')
-if (!require('vegan')) install.packages('vegan'); library('vegan')
-if (!require('ggrepel')) install.packages('ggrepel'); library('ggrepel')
-if (!require('ggforce')) install.packages('ggforce'); library('ggforce')
-if (!require('rstatix')) install.packages('rstatix'); library('rstatix')
-if (!require('effsize')) install.packages('effsize'); library('effsize')
-if (!require('psych')) install.packages('psych'); library('psych')
+# ================ #
+# Load packages ####
+# ================ #
+# Package names
+packages <- c("ggplot2", "tydyr" , "dplyr", "cometExactTest", "discover", "stringr", "maditr", "reshape2", "data.table", "epitools", "corrplot", "plyr", "muhaz", "reshape", "survival", "survivalAnalysis", "survMisc", "survminer", "ggsci", "vegan", "ggrepel", "ggforce", "rstatix", "effsize", "psych")
 
+# Install packages not yet installed
+installed_packages <- packages %in% rownames(installed.packages())
+if (any(installed_packages == FALSE)) {
+  install.packages(packages[!installed_packages])
+}
+
+# Packages loading
+invisible(lapply(packages, library, character.only = TRUE))
+
+# create directories
 dir.create("~/Desktop/MetaAML_results/Figure_2")
 dir.create("~/Desktop/MetaAML_results/Figure_2/Supplimental")
 
@@ -323,7 +304,7 @@ p = ggplot(gene_pairs_list_final_adj, aes(x=effect_size, y=-log10(p_value), colo
   geom_point(alpha = 0.75) +
   xlim(-1,2) +
   geom_point(shape = 21, color = "black", alpha = 0.25)  +
-  geom_label_repel(aes(label=point_label), size = 2.5, force = 75, max.overlaps = 5) +
+  geom_label_repel(aes(label=point_label), size = 2, force = 75, max.overlaps = 5) +
   scale_size_area(max_size = 10,breaks=c(10,25,50,100,250,350)) +
   scale_colour_manual(values = c("sig_pos_ES"="#b35806", "sig_neg_ES" = "#542788", "not_sig_ES"="lightgrey")) +
   theme(legend.position="right") +
@@ -564,12 +545,13 @@ for(i in 1:nrow(df)){
   }
 }
 
-p = ggplot(df, aes(x=log(odds_ratio), y=-log10(fishers_q), color = significant, size = n_cooccur)) +
+p1 = ggplot(df, aes(x=log(odds_ratio), y=-log10(fishers_q), color = significant, size = n_cooccur)) +
   theme_cowplot() +
+  geom_hline(yintercept=1.30103, linetype="dashed", color = "#d9d9d9") +
   geom_point(alpha = .75) +
   geom_label_repel(aes(label=labels),nudge_y = 5, size = 3, force = 25, max.overlaps = 5) +
   scale_colour_manual(values = c("Co-occuring"= "#b2182b", "Mutually exclusive"="#2166ac", "NS"="lightgrey")) + 
-  theme(legend.position = c(0.05,.85)) +
+  # theme(legend.position = c(0.05,.85)) +
   ylab(label= "-log10(q-value)") +
   xlab(label= "log(Odds Ratio)") +
   scale_size_area(max_size = 5,breaks=c(25,50,100,200,300)) +
@@ -577,9 +559,11 @@ p = ggplot(df, aes(x=log(odds_ratio), y=-log10(fishers_q), color = significant, 
 
 g = guide_legend(override.aes=list(colour="lightgrey"), "n. co-mut")
 
-p + guides(size = g, color = FALSE) 
+p1 = p1 + guides(size = FALSE, color = FALSE)  +
+  annotate(geom="text", x = 1.9, y = 0, label="q < 0.05",
+           color="grey")
 
- ggsave(filename = "~/Desktop/MetaAML_results/Figure_2/volcano_plot_co_occurence.pdf", dpi = 300, width = 3.5, height =  5, units = "in")
+ ggsave(filename = "~/Desktop/MetaAML_results/Figure_2/volcano_plot_co_occurence.pdf", dpi = 300, width = 5, height =  5, units = "in")
 
 
 # co-occurence and survival ####
@@ -1025,23 +1009,27 @@ for(i in 1:nrow(df)){
   }
 }
 
-p = ggplot(df, aes(x=df$HR, y=-log10(df$q_value), color = factor(significant), size = num_pts)) +
+p2 = ggplot(df, aes(x=df$HR, y=-log10(df$q_value), color = factor(significant), size = num_pts)) +
   theme_cowplot() +
   geom_hline(yintercept=1, linetype="dashed", color = "#d9d9d9") +
   geom_point(alpha = .75) +
+  scale_size_area(max_size = 5,breaks=c(25,50,100,200,300)) +
   geom_label_repel(aes(label=labels),size = 3, force = 50) +
-  scale_colour_manual(values = c("Favorable"= "#1b7837", "Unfavorable" = "#762a83", "NS"="#737373")) + 
+  scale_colour_manual(values = c("Favorable"= "#1b7837", "Unfavorable" = "#762a83", "NS"="grey")) + 
   theme_cowplot() +
-  theme(legend.position = c(0.05,.85)) +
+  # theme(legend.position = c(0.05,.85)) +
   ylab(label= "-log10(q-value)") +
   xlab(label= "Hazard Ratio") +
   labs(title = NULL) +
   theme(plot.title = element_text(color="black", size=20)) 
 g = guide_legend(override.aes=list(colour="lightgrey"), "n. co-mut")
 
-p  + guides(size = g, color = FALSE) 
+p2 = p2  + guides(size = g, color = FALSE, )  +
+  annotate(geom="text", x = 1.25, y = .75, label="q < 0.05",
+           color="grey")+
+  theme(legend.position = "top") 
 
-ggsave(filename = "~/Desktop/MetaAML_results/Figure_2/volcano_plot_co_occurence_survival.pdf", dpi = 300, width = 3.5, height =  5, units = "in")
+ggsave(filename = "~/Desktop/MetaAML_results/Figure_2/volcano_plot_co_occurence_survival.pdf", dpi = 300, width = 5, height =  5, units = "in")
 
 
 
@@ -1053,7 +1041,7 @@ colnames(odds_ratio) = c("gene_1", "gene_2", "odds_ratio", "q_value_odds")
 
 hazard_ratio = read.csv("~/Desktop/MetaAML_results/Data/Tables/pairwise_mutations_hazard_ratio.csv")
 hazard_ratio = hazard_ratio %>%
-  select(gene_1, gene_2, HR, q_value)
+  select(gene_1, gene_2, HR, q_value, num_pts)
 colnames(hazard_ratio)[4] = "q_value_HR"
 
 hr_odds = inner_join(odds_ratio, hazard_ratio, by = c("gene_1", "gene_2"))
@@ -1069,6 +1057,22 @@ for(i in 1:nrow(hr_odds)){
   }
 }
 
+# for(i in 1:nrow(hr_odds)){
+#   if(hr_odds$q_value_HR[i] < 0.1 & hr_odds$HR[i] > 1 & hr_odds$q_value_odds[i] < 0.1){
+#     hr_odds$color[i] = "HR q < 0.1\n"
+#   }
+#   if(hr_odds$q_value_HR[i] < 0.1 & hr_odds$HR[i] > 1 & hr_odds$q_value_odds[i] < 0.1){
+#     hr_odds$color[i] = "HR q < 0.1\nOR q < 0.1"
+#   }
+#   if(hr_odds$q_value_HR[i] < 0.1 & hr_odds$HR[i] < 1 & hr_odds$q_value_odds[i] < 0.1){
+#     hr_odds$color[i] = "HR q < 0.1\nHR<1\nOR q < 0.1"
+#   }
+#   if(hr_odds$q_value_HR[i] < 0.1 & hr_odds$HR[i] < 1 & hr_odds$q_value_odds[i] < 0.1){
+#     hr_odds$color[i] = "HR q < 0.1\nHR<1\nOR q < 0.1"
+#   }
+# }
+
+
 # add annotations for most significant interactions
 hr_odds$labels = NA
 
@@ -1080,30 +1084,43 @@ for(i in 1:nrow(hr_odds)){
   }
 }
 
-ggplot(hr_odds, aes(x = log(odds_ratio), y = log(HR), color = as.factor(color))) +
-  # geom_rect(data= hr_odds, inherit.aes = FALSE,
-  #             aes(xmin=-Inf, xmax=+Inf, ymin=-Inf, ymax=0), 
-  #             fill='#f4a582', alpha=0.5) +
-  # geom_rect(data= hr_odds, inherit.aes = FALSE,
-  #           aes(xmin=-Inf, xmax=+Inf, ymin=0, ymax=+Inf), 
-  #           fill='#d1e5f0') +
-  geom_point(aes(color = color, shape = ), size = 3, alpha = 0.75) +
+p3 = ggplot(hr_odds, aes(x = log(odds_ratio), y = log(HR), color = as.factor(color), size = num_pts)) +
+  geom_point(alpha = 0.75) +
   xlab("log(Odds Ratio)") +
   ylab("log(Hazard Ratio)") +
   scale_color_manual(values = c("#1b7837",  "#762a83", "grey")) +
-  geom_point(shape = 1, size =  3,colour = "black") +
+  scale_fill_manual(values = c("#1b7837",  "#762a83", "grey")) +
+  # geom_point(shape = 1, size = num_pts, colour = "black") +
   geom_hline(yintercept=log(1), linetype="dashed", color = "grey") +
   geom_vline(xintercept=log(1), linetype="dashed", color = "grey") +
-  geom_label_repel(aes(label=labels),
-                   size = 2.5) +
+  # geom_label_repel(aes(label=labels),
+  # size = 3) +
+  geom_smooth(method = lm, aes(fill = color),  alpha = .25) +
+  stat_cor(
+    aes(label = paste(..rr.label.., ..p.label.., sep = "~`,`~")),
+    label.x = -1.95, 
+    label.y = c(-.14,-.16,-.18)
+    
+  ) +
   theme_cowplot() +
-  theme(
-    legend.position = "none") 
+  scale_size_area(max_size = 5,breaks=c(25,50,100,200,300)) +
+  theme(plot.title = element_text(color="black", size=20))
+g = guide_legend(override.aes=list(colour="lightgrey"), "n. co-mut")
+
+p3  = p3 + guides(size = FALSE, color = FALSE, fill = FALSE) +
+  annotate(geom="text", x = 1.8, y = .25, label="26%",
+           color="#762a83") +
+  annotate(geom="text", x = -1.8, y = .25, label="28%",
+           color="#762a83")+
+  annotate(geom="text", x = 1.8, y = -.2, label="12%",
+           color="#1b7837") +
+  annotate(geom="text", x = -1.8, y = -.2, label="14%",
+           color="#1b7837")
 
 
-ggsave(filename = "~/Desktop/MetaAML_results/Figure_2/correlation_of_odds_ratio_and_HR_de_novo.pdf", dpi = 300, width = 4.5, height = 4.5, units = "in")
+ ggsave(filename = "~/Desktop/MetaAML_results/Figure_2/correlation_of_odds_ratio_and_HR_de_novo_2.pdf", dpi = 300, width = 5, height = 5, units = "in")
 
-write.csv(hr_odds, "~/Desktop/MetaAML_results/Data/Tables/correlation_of_odds_ratio_and_HR_de_novo.pdf.csv")
+  write.csv(hr_odds, "~/Desktop/MetaAML_results/Data/Tables/correlation_of_odds_ratio_and_HR_de_novo.pdf.csv")
 
 # test the enrichment of poor outcomes based on odds ratio
 
@@ -1139,6 +1156,356 @@ or_hr[2,1] <- 29
 or_hr[2,2] <- 31
 
 prop.test(table(or_hr$or, or_hr$hr), correct=FALSE) 
+
+
+
+# add the legend to the row we made earlier. Give it one-third of 
+# the width of one plot (via rel_widths).
+p = ggarrange(p1, p2, p3, ncol=3, nrow=1, common.legend = TRUE, legend="right")
+
+g = guide_legend(override.aes=list(colour="lightgrey"), "n. co-mut")
+
+p  + guides(size = g, color = FALSE, fill = FALSE) 
+      
+ggsave(filename = "~/Desktop/MetaAML_results/Figure_2/correlation_of_odds_ratio_and_HR_de_novo_all.pdf", dpi = 300, width = 15, height = 5, units = "in")
+
+
+# tripple mutation analysis ####
+# analyze the distribution and association of outcomes with triple mutation subsets
+
+load("~/Desktop/MetaAML_results/final_data_matrix.RData")
+
+# count the frequencies of recurrent mutations and select only genes with n > 50
+final_data_matrix_2_alt = final_data_matrix %>%
+  subset(Subset == "de_novo")
+
+for(i in 1:nrow(final_data_matrix_2_alt)){
+  if(final_data_matrix_2_alt$Gene[i] == "FLT3" & final_data_matrix_2_alt$variant_type[i] == "ITD"){
+    final_data_matrix_2_alt$Gene[i] <- "FLT3-ITD"
+  }
+  if(final_data_matrix_2_alt$Gene[i] == "FLT3" & final_data_matrix_2_alt$variant_type[i] == "SNV"){
+    final_data_matrix_2_alt$Gene[i] <- "FLT3-TKD"
+  }
+  if(final_data_matrix_2_alt$Gene[i] == "FLT3" & final_data_matrix_2_alt$variant_type[i] == "Deletion"){
+    final_data_matrix_2_alt$Gene[i] <- "FLT3-TKD"
+  }
+  if(final_data_matrix_2_alt$Gene[i] == "FLT3" & final_data_matrix_2_alt$variant_type[i] == "INDEL"){
+    final_data_matrix_2_alt$Gene[i] <- "FLT3-ITD"
+  }
+  if(final_data_matrix_2_alt$Gene[i] == "FLT3" & final_data_matrix_2_alt$variant_type[i] == "other"){
+    final_data_matrix_2_alt$Gene[i] <- "FLT3-TKD"
+  }
+}
+
+three_mutations = final_data_matrix_2_alt %>%
+  group_by(Gene) %>%
+  count(Gene, sort = TRUE) %>%
+  filter(n > 50)
+
+# find all 3-way mutation combinations
+genes = as.data.frame(t(combn(as.vector(unique(three_mutations$Gene)),3)))
+genes$n_3_mut = NA
+
+# select columns for analysis from data matrix
+three_mutations_clinical = final_data_matrix_2_alt %>%
+  select(Sample, Gene, Time_to_OS, Censor)
+
+# select individual patients
+three_mutations_pts = final_data_matrix_2_alt %>%
+  select(Sample) %>%
+  distinct() %>%
+  mutate(three_mutations = 0)
+
+mut_list = list()
+
+for(i in 1:nrow(genes)){
+  print(i)
+  gene_list = c(genes[i,1:3])
+  for(j in 1:nrow(three_mutations_pts)){
+    pt = three_mutations_clinical %>%
+      subset(Sample == three_mutations_pts$Sample[j])
+    if(gene_list$V1[1] %in% pt$Gene & gene_list$V2[1] %in% pt$Gene & gene_list$V3[1] %in% pt$Gene){
+      # print("TRUE")
+      three_mutations_pts$three_mutations[j] = 1
+    } else {
+      # print("FALSE")
+      three_mutations_pts$three_mutations[j] = 0
+    }
+  }
+  genes$n_3_mut[i] = length(which(three_mutations_pts$three_mutations == 1))
+}
+
+genes_all_3_mut_n_over_5 = genes %>%
+  filter(n_3_mut >= 10)
+
+# now perform survival analysis between genotypes in the set of mutations with at least 10 patiens with 3 co-occuring mutations
+
+# create columns for the 3 gene genotypes
+genes_all_3_mut_n_over_5$genotype = do.call(paste, c(genes_all_3_mut_n_over_5[,1:3], sep = '_'))
+
+cnames = c(dcast(genes_all_3_mut_n_over_5,.~genotype))
+cnames[1] = NULL
+
+for(i in cnames){
+  three_mutations_pts[,i] = 0
+}
+
+three_mutations_pts <- three_mutations_pts %>%
+  mutate_if(is.logical, as.numeric)
+
+three_mutations_pts[three_mutations_pts == 0] <- "WT"
+
+# function to find genes not in a list
+"%ni%" <- Negate("%in%") 
+
+# loop through all of the mutation genotype combinations and label each patient based on the genotype. This will be done foe specific genotypes and 
+three_mutations_pts_simple = three_mutations_pts
+
+for(i in 1:nrow(genes_all_3_mut_n_over_5)){
+  print(i)
+  gene_list = c(genes_all_3_mut_n_over_5[i,1:3])
+  mut_genotype = genes_all_3_mut_n_over_5[i,5]
+  c_num = as.numeric(which(colnames(three_mutations_pts) == mut_genotype))
+  for(j in 1:nrow(three_mutations_pts)){
+    pt = three_mutations_clinical %>%
+      subset(Sample == three_mutations_pts$Sample[j])
+    if(gene_list$V1[1] %in% pt$Gene & gene_list$V2[1] %in% pt$Gene & gene_list$V3[1] %in% pt$Gene){
+      three_mutations_pts[j,c_num] = paste(gene_list$V1[1], gene_list$V2[1], gene_list$V3[1], sep = "_")
+      three_mutations_pts_simple[j,c_num] = "3_mut"
+    } 
+    if(gene_list$V1[1] %in% pt$Gene & gene_list$V2[1] %in% pt$Gene & gene_list$V3[1] %ni% pt$Gene){
+      three_mutations_pts[j,c_num] = paste(gene_list$V1[1], gene_list$V2[1], sep = "_")
+      three_mutations_pts_simple[j,c_num] = "2_mut"
+    }
+    if(gene_list$V1[1] %in% pt$Gene & gene_list$V2[1] %ni% pt$Gene & gene_list$V3[1] %in% pt$Gene){
+      three_mutations_pts[j,c_num] = paste(gene_list$V1[1], gene_list$V3[1], sep = "_")
+      three_mutations_pts_simple[j,c_num] = "2_mut"
+    }
+    if(gene_list$V1[1] %ni% pt$Gene & gene_list$V2[1] %in% pt$Gene & gene_list$V3[1] %in% pt$Gene){
+      three_mutations_pts[j,c_num] = paste(gene_list$V2[1], gene_list$V3[1], sep = "_")
+      three_mutations_pts_simple[j,c_num] = "2_mut"
+    }
+    if(gene_list$V1[1] %in% pt$Gene & gene_list$V2[1] %ni% pt$Gene & gene_list$V3[1] %ni% pt$Gene){
+      three_mutations_pts[j,c_num] = paste(gene_list$V1[1])
+      three_mutations_pts_simple[j,c_num] = "1_mut"
+    }
+    if(gene_list$V1[1] %ni% pt$Gene & gene_list$V2[1] %in% pt$Gene & gene_list$V3[1] %ni% pt$Gene){
+      three_mutations_pts[j,c_num] = paste(gene_list$V2[1])
+      three_mutations_pts_simple[j,c_num] = "1_mut"
+    }
+    if(gene_list$V1[1] %ni% pt$Gene & gene_list$V2[1] %ni% pt$Gene & gene_list$V3[1] %in% pt$Gene){
+      three_mutations_pts[j,c_num] = paste(gene_list$V3[1])
+      three_mutations_pts_simple[j,c_num] = "1_mut"
+    }
+  }
+}
+
+# select the survival data
+three_mutations_clinical = three_mutations_clinical %>%
+  select(Sample, Time_to_OS, Censor) %>%
+  unique()
+
+# pair survival data with genotypes on a granular level
+genotype_survival = left_join(three_mutations_pts, three_mutations_clinical, by = "Sample")
+genotype_survival$Censor = as.numeric(genotype_survival$Censor)
+genotype_survival$Time_to_OS = genotype_survival$Time_to_OS/365
+
+write_csv(genotype_survival, "~/Desktop/MetaAML_results/Figure_2/genotype_combinations.csv")
+
+# pair survival data with genotypes on a broad level
+genotype_survival_simple = left_join(three_mutations_pts_simple, three_mutations_clinical, by = "Sample")
+genotype_survival_simple$Censor = as.numeric(genotype_survival_simple$Censor)
+genotype_survival_simple$Time_to_OS = genotype_survival_simple$Time_to_OS/365
+
+hr_info = list()
+n = 1
+options(scipen = 999)
+for(i in 3:50){
+  
+  genotype_survival_simple[[i]][!grepl("2_mut|3_mut",genotype_survival_simple[[i]])]<-NA
+  
+  genotype_names = paste(colnames(genotype_survival_simple)[i])
+  genotype_names = gsub("_", " + ", genotype_names, fixed=TRUE)
+  
+  
+  
+  fit <- survfit(Surv(Time_to_OS, Censor) ~ genotype_survival_simple[[i]], data = genotype_survival_simple)
+  names(fit$strata) = as.character(names(fit$strata))
+  names(fit$strata) = gsub("genotype_survival_simple[[i]]=", "", names(fit$strata), fixed = T)
+  names(fit$strata) = gsub("_", " ", names(fit$strata), fixed = T)
+  
+  surv_plot = ggsurvplot(fit,
+                         conf.int = F,
+                         risk.table = T,
+                         pval = T,
+                         pval.coord = c(0, 0),
+                         # ggtheme = theme_pubr(),
+                         title = paste(genotype_names),
+                         # palette = "uchicago",
+                         palette = c("darkgrey", "darkred"),
+                         risk.table.y.text = FALSE,
+                         tables.y.text = FALSE,
+                         legend = "right",
+                         legend.title = "",
+                         xlab = "Years")
+  
+  print(surv_plot)
+  png(filename = paste("~/Desktop/MetaAML_results/Figure_2/Supplimental/2_3_genotypes/broad/",genotype_names,"survival.png", sep = ""), res = 300, width = 6, height = 6, units = "in")
+  # ggsave(file = paste("~/Desktop/Majeti_Lab/Manuscripts/Meta_AML/Final_submission_materials/Nat_Comm/Revisions/Comment_2/2_3_genotypes/broad/",genotype_names,"survival.pdf", sep = ""), print(surv_plot))
+  
+  surv_plot
+  print(surv_plot)
+  dev.off()
+  
+  
+  # extract data from survfit
+  model <- coxph( Surv(Time_to_OS, Censor) ~ genotype_survival_simple[[i]],
+                  data = genotype_survival_simple )
+  
+  # extract the informative data from the survival model
+  array_dat = summary(model)$conf.int[1:4]
+  array_dat[5] = genotype_names
+  
+  # extract the log-rank p-value for the individual comparisons
+  array_dat[6] = summary(model)$sctest[3]
+  array_dat = array_dat[-2]
+  
+  forest_plot_data <- data.frame("Genes" = array_dat[4], "HR" = array_dat[1], "Lower_CI" = round(as.numeric(array_dat[2]),2), "Upper_CI" = round(as.numeric(array_dat[3]),2), "log_rank_p" = format(array_dat[5], scientific=F))
+  
+  hr_info[[n]] <- forest_plot_data
+  n=n+1   
+  
+}
+hr_info_final = as.data.frame(do.call(rbind, hr_info)) 
+hr_info_final = unique(hr_info_final)
+hr_info_final$Genes <- factor(hr_info_final$Genes, levels = hr_info_final$Genes[order(hr_info_final$HR)])
+
+write_csv(hr_info_final, "~/Desktop/MetaAML_results/Figure_2/3_mut_hr_table.csv")
+
+
+hr_info_final$sig_color = 0
+
+for(i in 1:nrow(hr_info_final)){
+  if(hr_info_final$log_rank_p[i] < 0.05 & hr_info_final$HR[i] < 1){
+    hr_info_final$sig_color[i] = 1
+  }
+  if(hr_info_final$log_rank_p[i] < 0.05 & hr_info_final$HR[i] > 1){
+    hr_info_final$sig_color[i] = 2
+  }
+}
+
+hr_info_final$sig_color = as.factor(hr_info_final$sig_color)
+hr_info_final$fdr = p.adjust(hr_info_final$log_rank_p, method = "fdr")
+hr_info_final$sig_color = as.factor(hr_info_final$sig_color)
+hr_info_final = subset(hr_info_final, hr_info_final$Upper_CI != "Inf")
+hr_info_final$categories <- reorder(hr_info_final$categories, hr_info_final$HR)
+
+
+hr_info_final$p_text = NA
+for(i in 1:nrow(hr_info_final)){
+  if(hr_info_final$log_rank_p[i] < 0.05){
+    hr_info_final$p_text[i] = hr_info_final$log_rank_p[i]
+  }
+}
+hr_info_final$q_text = NA
+for(i in 1:nrow(hr_info_final)){
+  if(hr_info_final$fdr[i] < 0.5){
+    hr_info_final$q_text[i] = hr_info_final$fdr[i]
+  }
+}
+
+hr_info_final$p_text = as.numeric(hr_info_final$p_text)
+hr_info_final$q_text = as.numeric(hr_info_final$q_text)
+
+hr_info_final$p_text = round(hr_info_final$p_text, 3)
+hr_info_final$q_text = round(hr_info_final$q_text, 2)
+
+for(i in 1:nrow(hr_info_final)){
+  if(hr_info_final$log_rank_p[i] < 0.01){
+    hr_info_final$p_text[i] = "p < 0.01"
+  }
+  if(hr_info_final$log_rank_p[i] >= 0.01 & hr_info_final$log_rank_p[i] <= 0.05){
+    hr_info_final$p_text[i] = paste("p =", paste(hr_info_final$p_text[i]))
+  }
+  if(hr_info_final$fdr[i] < 0.01){
+    hr_info_final$q_text[i] = "q < 0.01"
+  }
+  if(hr_info_final$fdr[i] >= 0.01 & hr_info_final$log_rank_p[i] <= 0.05){
+    hr_info_final$q_text[i] = paste("q =", paste(hr_info_final$q_text[i]))
+  }
+}
+
+hr_info_final$p_q_text = paste(hr_info_final$p_text, "; ", hr_info_final$q_text, sep = "")
+
+for(i in 1:nrow(hr_info_final)){
+  if(hr_info_final$log_rank_p[i] > 0.05){
+    hr_info_final$p_q_text[i] = ""
+  }
+  if(hr_info_final$log_rank_p[i] > 0.05){
+    hr_info_final$p_q_text[i] = ""
+  }
+}
+
+hr_info_final$HR = as.numeric(hr_info_final$HR)
+hr_info_final$Lower_CI = as.numeric(hr_info_final$Lower_CI)
+hr_info_final$Upper_CI = as.numeric(hr_info_final$Upper_CI)
+
+hr_info_final$Genes <- factor(hr_info_final$Genes, levels = hr_info_final$Gene[order(hr_info_final$HR)])
+
+names(hr_info_final)[1] = "genotype"
+
+genes_all_3_mut_n_over_5$genotype =gsub("_", " + ", genes_all_3_mut_n_over_5$genotype, fixed=TRUE)
+hr_info_final$genotype = gsub("_", " + ", hr_info_final$genotype, fixed=TRUE)
+
+hr_info_final = left_join(hr_info_final, genes_all_3_mut_n_over_5, by = "genotype")
+
+hr_info_final$genotype <- reorder(hr_info_final$genotype, hr_info_final$HR)
+
+ggplot(hr_info_final, aes(x = genotype, y = HR, label = p_q_text)) +
+  geom_hline(yintercept=1, linetype="dashed", color = "black") +
+  geom_text(aes(genotype, Upper_CI), hjust = 0, nudge_y = 0.6) +
+  geom_point(aes(size = n_3_mut, color = sig_color), shape = 19, alpha = .9) +
+  geom_segment(data = hr_info_final, aes(y = Lower_CI, yend = Upper_CI, x = genotype, xend = genotype, col= sig_color), size = 0.5) +
+  scale_color_manual(values = c("1" = "#1b7837", "2" = "#762a83"))+
+  ylab("Hazard Ratio\n(3 muts vs. 2 muts)")+
+  ylim(0,8)+
+  theme_cowplot() +
+  theme(legend.position = c(0.7, .1),
+        axis.title.y=element_blank()) +
+  coord_flip() +
+  guides(color = FALSE,
+         size =  guide_legend(override.aes=list(colour="lightgrey"), title = "# of patients with\n3 mutations"))
+
+ggsave(filename = "~/Desktop/MetaAML_results/Figure_2/_3_mut_forrest_plot.pdf", dpi = 300, width = 8.5, height = 10, units = "in")
+
+
+# distribution of genotype frequencies
+# genotypes with enough survival data for analysis
+genotype_list = hr_info_final %>%
+  subset(sig_color != 0) %>%
+  select(genotype)
+
+genes_all_3_mut_n_over_5 = genes_all_3_mut_n_over_5 %>%
+  mutate(`Survival association` = ifelse(genotype %in% genotype_list$genotype, "Yes", "No")) 
+
+
+ggplot(data=genes_all_3_mut_n_over_5, aes(x=reorder(genotype, -n_3_mut), y = n_3_mut, fill = `Survival association`)) +
+  theme_cowplot() +
+  geom_bar(stat="identity") +
+  scale_fill_manual(values=c('grey', "darkred")) +
+  geom_text(aes(label=n_3_mut), vjust=-0.3, size=3.5) +
+  theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust = 1), axis.title.x = element_blank(), legend.position = c(.9, 0.5)) +
+  ylab("\n\n\n# of patiens\nwith 3 mutations") 
+
+ggsave(filename = "~/Desktop/MetaAML_results/Figure_2/three_mut_genotype_distribution.pdf", dpi = 300, width = 20, height = 5, units = "in")
+
+
+
+
+
+
+
+
 
 
 
@@ -1413,88 +1780,526 @@ ggsave(filename = "~/Desktop/MetaAML_results/Figure_2/Supplimental/Individual_ge
 write.csv(gene_pairs_list_final_adj, file = "~/Desktop/MetaAML_results/Figure_2/Supplimental/gene_clinical_features.csv")
 
 
- # forrest plot ####
-# individual mutation's HRs
 
-temp_final_hr_2$gene <- factor(temp_final_hr_2$gene, levels = temp_final_hr_2$gene[order(temp_final_hr_2$HR)])
-temp_final_hr_2$log_rank_p = round(temp_final_hr_2$log_rank_p, 3)
-temp_final_hr_2$p_text = NA
+# 4. The authors should make it more clear how they are addressing cases in which there are multiple mutations in the same gene or pathway (i.e. RAS/MAPK-pathway mutations). Does convergent evolution influence clinical correlates or survival outcomes?
+load("~/Desktop/MetaAML_results/final_data_matrix_2.RData")
 
-for(i in 1:nrow(temp_final_hr_2)){
-  if(temp_final_hr_2$log_rank_p[i] <= 0.05 & temp_final_hr_2$log_rank_p[i] >= 0.001){
-    temp_final_hr_2$p_text[i] = paste("p = ", temp_final_hr_2$log_rank_p[i], sep = "")
-  } 
-  if(temp_final_hr_2$log_rank_p[i] == 0){
-    temp_final_hr_2$p_text[i] = paste("p < 0.001")
-  } 
-  if(temp_final_hr_2$log_rank_p[i] > 0.05){
-    temp_final_hr_2$p_text[i] = ""
+final_data_matrix_2_alt = final_data_matrix_2 %>%
+  subset(Subset == "de_novo")
+
+for(i in 1:nrow(final_data_matrix_2_alt)){
+  if(final_data_matrix_2_alt$Gene[i] == "FLT3" & final_data_matrix_2_alt$variant_type[i] == "ITD"){
+    final_data_matrix_2_alt$Gene[i] <- "FLT3-ITD"
+  }
+  if(final_data_matrix_2_alt$Gene[i] == "FLT3" & final_data_matrix_2_alt$variant_type[i] == "SNV"){
+    final_data_matrix_2_alt$Gene[i] <- "FLT3-TKD"
+  }
+  if(final_data_matrix_2_alt$Gene[i] == "FLT3" & final_data_matrix_2_alt$variant_type[i] == "Deletion"){
+    final_data_matrix_2_alt$Gene[i] <- "FLT3-TKD"
+  }
+  if(final_data_matrix_2_alt$Gene[i] == "FLT3" & final_data_matrix_2_alt$variant_type[i] == "INDEL"){
+    final_data_matrix_2_alt$Gene[i] <- "FLT3-ITD"
+  }
+  if(final_data_matrix_2_alt$Gene[i] == "FLT3" & final_data_matrix_2_alt$variant_type[i] == "other"){
+    final_data_matrix_2_alt$Gene[i] <- "FLT3-TKD"
   }
 }
 
-# add functional category to the mutations for visualization purposes
-temp_final_hr_2$mutation_category <- NA
+# add a column for annotating the mutation category
+final_data_matrix_2_alt$mutation_category <- NA
 
 DNA_methylation <- list("DNMT3A","IDH2","TET2","IDH1")
 Chromatin_cohesin <- list("ASXL1", "RAD21", "STAG2", "EZH2", "BCOR")
-RTK_RAS_Signaling <- list("PTPN11", "CBL", "NF1", "KRAS", "KIT", "NRAS", "FLT3-ITD", "FLT3-TKD", "JAK2")
+RTK_RAS_Signaling <- list("PTPN11", "CBL", "NF1", "KRAS", "KIT", "NRAS", "FLT3-ITD", "FLT3-TKD")
 Splicing <- list("SF3B1", "SRSF2", "U2AF1")
-Transcription <- list("CEBPA", "GATA2", "RUNX1", "MYC", "ETV6", "ZBTB33", "MLL")
+Transcription <- list("CEBPA", "GATA2", "RUNX1", "MYC", "ETV6", "ZBTB33")
 Tumor_suppressors <- list("TP53", "PHF6", "WT1")
 
-for(i in 1:nrow(temp_final_hr_2)){
-  if(temp_final_hr_2$gene[i] %in% DNA_methylation){
-    temp_final_hr_2$mutation_category[i] <- "DNA Methylation"
+for(i in 1:nrow(final_data_matrix_2_alt)){
+  if(final_data_matrix_2_alt$Gene[i] %in% DNA_methylation){
+    final_data_matrix_2_alt$mutation_category[i] <- "DNA Methylation"
   }
-  if(temp_final_hr_2$gene[i] %in% Chromatin_cohesin){
-    temp_final_hr_2$mutation_category[i] <- "Chromatin/Cohesin"
+  if(final_data_matrix_2_alt$Gene[i] %in% Chromatin_cohesin){
+    final_data_matrix_2_alt$mutation_category[i] <- "Chromatin/Cohesin"
   }
-  if(temp_final_hr_2$gene[i] %in% RTK_RAS_Signaling){
-    temp_final_hr_2$mutation_category[i] <- "RTK/RAS Signaling"
+  if(final_data_matrix_2_alt$Gene[i] %in% RTK_RAS_Signaling){
+    final_data_matrix_2_alt$mutation_category[i] <- "RTK/RAS Signaling"
   }
-  if(temp_final_hr_2$gene[i] %in% Splicing){
-    temp_final_hr_2$mutation_category[i] <- "Splicing"
+  if(final_data_matrix_2_alt$Gene[i] %in% Splicing){
+    final_data_matrix_2_alt$mutation_category[i] <- "Splicing"
   }
-  if(temp_final_hr_2$gene[i] %in% Transcription){
-    temp_final_hr_2$mutation_category[i] <- "Transcription"
+  if(final_data_matrix_2_alt$Gene[i] %in% Transcription){
+    final_data_matrix_2_alt$mutation_category[i] <- "Transcription"
   }
-  if(temp_final_hr_2$gene[i] == "NPM1"){
-    temp_final_hr_2$mutation_category[i] <- "NPM1"
+  if(final_data_matrix_2_alt$Gene[i] == "NPM1"){
+    final_data_matrix_2_alt$mutation_category[i] <- "NPM1"
   }
-  if(temp_final_hr_2$gene[i] %in% Tumor_suppressors){
-    temp_final_hr_2$mutation_category[i] <- "Tumor suppressors"
+  if(final_data_matrix_2_alt$Gene[i] %in% Tumor_suppressors){
+    final_data_matrix_2_alt$mutation_category[i] <- "Tumor suppressors"
   }
 }
 
-# extract the p-value and hazard ratio for the individual interactions
-p = round(as.numeric(summary(model)$sctest[3]), 3)
+convergent_gene = final_data_matrix_2_alt %>%
+  group_by(Gene) %>%
+  count(Sample, sort = TRUE) 
 
-p = ifelse(p < 0.001, paste0("p < 0.001"), paste("p =", p))
+convergent_clinical = final_data_matrix_2_alt %>%
+  subset(Subset == "de_novo") %>%
+  select(Sample, BM_blast_percent, PB_blast_percent, WBC, Hemoglobin, LDH, Platelet, Age, Censor, Time_to_OS) %>%
+  unique()
 
-hr = paste("HR = ", round(as.numeric(forest$HR), 2), " (", round(as.numeric(forest$lower_95), 2), "-", round(as.numeric(forest$upper_95), 2), ")", sep = "")
+convergent_clinical_merged = left_join(convergent_clinical, convergent_gene, by = "Sample")
 
-p_hr = paste(p, "; ", hr, sep = "")
+convergent_genes = final_data_matrix_2_alt %>%
+  group_by(Gene) %>%
+  count(Sample, sort = TRUE) %>%
+  filter(n > 1) %>%
+  distinct(Gene)
+
+variable_df_list_1 = list()
+forest_plot_data_list = list()
+
+k = 1
+for(i in 1:nrow(convergent_genes)){
+  sub_dat_final = convergent_clinical_merged %>%
+    subset(Gene == convergent_genes$Gene[i]) %>%
+    distinct(Sample, BM_blast_percent, PB_blast_percent, WBC, Hemoglobin, LDH, Platelet, Age, Censor, Time_to_OS, n)
+  
+  sub_dat_final$n = as.factor(ifelse(sub_dat_final$n>1, ">1", "1"))
+  
+  if(length(which(sub_dat_final$n != 1)) > 9){
+    l = 1
+    for(j in 2:8){
+      # calculate a p-value and effect size for the difference in clinical feaures based on number of mutations
+      # need to dynamically chage the column name for the variable of interest in order to calculate the effect size. will change back
+      col_name = as.character(colnames(sub_dat_final[j])[j])
+      names(sub_dat_final)[names(sub_dat_final) == col_name] <- "Variable"
+      
+      sub_dat_final[[j]] = as.numeric(sub_dat_final[[j]])
+      
+      # calculate effect sizes for clinical correlates
+      p_val =  wilcox.test(sub_dat_final[[j]] ~ sub_dat_final$n, alternative = "two.sided")$p.value
+      
+      effect_size = cohens_d(data = sub_dat_final, Variable ~ n)$effsize
+      effect_size_ci = cohens_d(data = sub_dat_final, Variable ~ n, ci = TRUE)
+      n_n1 = as.numeric(length(which(sub_dat_final$n == ">1")))
+      n_n2 = as.numeric(length(which(sub_dat_final$n == "1")))
+      effect_size_ci = psych::cohen.d.ci(d = effect_size, n = n, n1 = n_n1, n2 = n_n2)
+      
+      variable_df <- data.frame(matrix(NA, nrow = 1, ncol = 6))
+      names(variable_df) <- c("Variable", "Mutated_Gene", "effect_size", "CI_lower", "CI_upper", "p_value")
+      
+      variable_df[1,1] <- paste(col_name)
+      variable_df[1,2] <- convergent_genes$Gene[i]
+      variable_df[1,3] <- effect_size
+      variable_df[1,4] <- effect_size_ci$conf.low[1]
+      variable_df[1,5] <- effect_size_ci$conf.high[1]
+      variable_df[1,6] <- p_val
+      
+      # Add each list in the loop to a list of lists and rename column
+      variable_df_list_1[[l]] = variable_df 
+      l = l + 1 
+      
+      names(sub_dat_final)[names(sub_dat_final) == "Variable"] = col_name
+      
+    }
+    variable_df_list_1_temp = do.call(rbind, variable_df_list_1)
+    variable_df_list_1_temp = variable_df_list_1_temp %>%
+      mutate(q_val = p.adjust(variable_df_list_1_temp$p_value))
+    
+    variable_df_list_2[[k]] = variable_df_list_1_temp
+    k=k+1
+    
+    # calculate hazard ratios and confidence intervals for survival outcomes
+    sub_dat_final$Censor = as.numeric(sub_dat_final$Censor)
+    # OS_fit <- survfit(Surv(Time_to_OS, Censor) ~ 1, data=sub_dat_final)
+    # OS_trt_fit <- survfit(Surv(Time_to_OS, Censor) ~ n, data=sub_dat_final, conf.type = "log-log")
+    
+    # run the Cox model
+    model <- coxph( Surv(Time_to_OS, Censor) ~ n,
+                    data = sub_dat_final )
+    
+    # extract the informative data from the survival model
+    array_dat = summary(model)$conf.int[1:4]
+    array_dat[5] = convergent_genes$Gene[i]
+    
+    # extract the log-rank p-value for the individual comparisons
+    array_dat[6] = summary(model)$sctest[3]
+    array_dat = array_dat[-2]
+    
+    forest_plot_data <- data.frame("Variable" = "Survival", "Mutated_Gene" = array_dat[4], "HR" = array_dat[1], "Lower_CI" = round(as.numeric(array_dat[2]),2), "Upper_CI" = round(as.numeric(array_dat[3]),2), "log_rank_p" = array_dat[5])
+    
+    forest_plot_data_list[[i]] = forest_plot_data
+    
+  }
+  
+}
+# bind all of the clinical outcomes data and correct for FDR
+forest_plot_data_list_all = do.call(rbind, forest_plot_data_list)
+forest_plot_data_list_all$q_val = p.adjust(forest_plot_data_list_all$log_rank_p)
+
+# bind all of the clinical correlates data
+variable_df_list_all <- do.call(rbind, variable_df_list_2)
+variable_df_list_all$sig = NA
+for(i in 1:nrow(variable_df_list_all)){
+  if(variable_df_list_all$q_val[i] > 0.3 ){
+    variable_df_list_all$sig[i] = "q > 0.3"
+  }
+  if(variable_df_list_all$q_val[i] < 0.3 & variable_df_list_all$q_val[i] > 0.1 & variable_df_list_all$p_value[i] < 0.05){
+    variable_df_list_all$sig[i] = "q < 0.3"
+  }
+  if(variable_df_list_all$q_val[i] < 0.1 & variable_df_list_all$p_value[i] < 0.05){
+    variable_df_list_all$sig[i] = "q < 0.1"
+  }
+}
 
 
-# color coded by mutation category plot
-ggplot(temp_final_hr_2, aes(x = reorder(gene, -HR), y = HR, label = temp_final_hr_2$p_text)) +
-  geom_hline(yintercept=.5, linetype="dashed", color = "#d9d9d9") +
-  geom_hline(yintercept=1, linetype="dashed", color = "black") +
-  geom_hline(yintercept=2, linetype="dashed", color = "#d9d9d9") +
-  geom_hline(yintercept=3, linetype="dashed", color = "#d9d9d9") +
-  geom_text(aes(gene, upper_95), hjust = 0, nudge_y = 0.35, size = 3) +
+# order the factors
+variable_df_list_all$Variable = factor(variable_df_list_all$Variable, levels=c('WBC','Hemoglobin','Platelet','LDH', 'BM_blast_percent', 'PB_blast_percent', 'Age'))
+
+# plot the discrete results
+p1 = ggplot(variable_df_list_all, aes(x = Mutated_Gene, y = effect_size, label = p_value)) +
+  geom_hline(yintercept=0, linetype = "dashed", color = "black") +
   theme_cowplot() +
-  ylim(0,5.25) +
-  geom_pointrange(size = .75, stat = "identity", shape = 15, 
-                  aes(x = gene, ymin = lower_95, ymax = upper_95, y = HR, color = mutation_category)) +
-  scale_color_manual(name = "", values = c("DNA Methylation" = "#374E55FF", "Chromatin/Cohesin" = "#DF8F44FF", "RTK/RAS Signaling" = "#00A1D5FF", "Splicing" = "#B24745FF", "Transcription" = "#79AF97FF", "NPM1" = "#80796BFF", "Tumor suppressors" = "#6A6599FF")) +
-  ylab("Hazard Ratio")+
-  xlab(NULL) +
-  theme(legend.position = c(0.6,0.25),
-        axis.title.y=element_blank(),
-        axis.line.y = element_blank(),
-        axis.ticks.y = element_blank()) +
+  geom_pointrange(size = 0.75, stat = "identity", 
+                  aes(x = Mutated_Gene, ymin = CI_lower, ymax = CI_upper, y = effect_size, color = sig)) +
+  scale_color_manual(values = c( "q < 0.3" = "#1F968BFF", "q < 0.1" = "#482677FF", "q > 0.3" = "grey")) +
+  ylab("Effect Size (multi-mut vs. 1 mut)")+
+  xlab("")+
+  theme(legend.position = "right", legend.title = element_blank(),
+        axis.title.y=element_blank()) +
+  coord_flip() +
+  xlim(rev(levels(factor(variable_df_list_all$Mutated_Gene))))
+
+p1 = p1 + facet_grid(. ~ Variable) +
+  theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust = 1)) +
+  theme(strip.background = element_rect(colour="black", fill="white",
+                                        size=1.5, linetype="solid"))
+
+ggsave(filename = "~/Desktop/Majeti_Lab/Manuscripts/Meta_AML/Final_submission_materials/Nat_Comm/Revisions/Comment_4/multi_mut_clinical_features_discrete.pdf", dpi = 300, width = 15, height = 3, units = "in") 
+
+# vizualize all of the survival hazard ratios
+
+forest_plot_data_list_all$sig_color = 0
+
+for(i in 1:nrow(forest_plot_data_list_all)){
+  if(forest_plot_data_list_all$log_rank_p[i] < 0.05 & forest_plot_data_list_all$HR[i] < 1){
+    forest_plot_data_list_all$sig_color[i] = 1
+  }
+  if(forest_plot_data_list_all$log_rank_p[i] < 0.05 & forest_plot_data_list_all$HR[i] > 1){
+    forest_plot_data_list_all$sig_color[i] = 2
+  }
+}
+
+forest_plot_data_list_all$sig_color = as.factor(forest_plot_data_list_all$sig_color)
+forest_plot_data_list_all$sig_color = as.factor(forest_plot_data_list_all$sig_color)
+forest_plot_data_list_all = subset(forest_plot_data_list_all, forest_plot_data_list_all$Upper_CI != "Inf")
+forest_plot_data_list_all$categories <- reorder(forest_plot_data_list_all$categories, forest_plot_data_list_all$HR)
+
+
+forest_plot_data_list_all$p_text = NA
+for(i in 1:nrow(forest_plot_data_list_all)){
+  if(forest_plot_data_list_all$log_rank_p[i] < 0.05){
+    forest_plot_data_list_all$p_text[i] = forest_plot_data_list_all$log_rank_p[i]
+  }
+}
+forest_plot_data_list_all$q_text = NA
+for(i in 1:nrow(forest_plot_data_list_all)){
+  if(forest_plot_data_list_all$q_val[i] < 0.5){
+    forest_plot_data_list_all$q_text[i] = forest_plot_data_list_all$q_val[i]
+  }
+}
+
+forest_plot_data_list_all$p_text = as.numeric(forest_plot_data_list_all$p_text)
+forest_plot_data_list_all$q_text = as.numeric(forest_plot_data_list_all$q_text)
+
+forest_plot_data_list_all$p_text = round(forest_plot_data_list_all$p_text, 3)
+forest_plot_data_list_all$q_text = round(forest_plot_data_list_all$q_text, 2)
+
+for(i in 1:nrow(forest_plot_data_list_all)){
+  if(forest_plot_data_list_all$log_rank_p[i] < 0.01){
+    forest_plot_data_list_all$p_text[i] = "p < 0.01"
+  }
+  if(forest_plot_data_list_all$log_rank_p[i] >= 0.01 & forest_plot_data_list_all$log_rank_p[i] <= 0.05){
+    forest_plot_data_list_all$p_text[i] = paste("p =", paste(forest_plot_data_list_all$p_text[i]))
+  }
+}
+
+forest_plot_data_list_all$p_q_text = paste(forest_plot_data_list_all$p_text, "; q = ", forest_plot_data_list_all$q_text, sep = "")
+
+for(i in 1:nrow(forest_plot_data_list_all)){
+  if(forest_plot_data_list_all$log_rank_p[i] > 0.05){
+    forest_plot_data_list_all$p_q_text[i] = ""
+  }
+  if(forest_plot_data_list_all$log_rank_p[i] > 0.05){
+    forest_plot_data_list_all$p_q_text[i] = ""
+  }
+}
+
+forest_plot_data_list_all$HR = as.numeric(forest_plot_data_list_all$HR)
+forest_plot_data_list_all$Lower_CI = as.numeric(forest_plot_data_list_all$Lower_CI)
+forest_plot_data_list_all$Upper_CI = as.numeric(forest_plot_data_list_all$Upper_CI)
+
+forest_plot_data_list_all$Mutated_Gene <- factor(forest_plot_data_list_all$Mutated_Gene, levels = forest_plot_data_list_all$Mutated_Gene[order(forest_plot_data_list_all$HR)])
+
+p2 = ggplot(forest_plot_data_list_all, aes(x = reorder(Mutated_Gene, -HR), y = HR, label = p_q_text)) +
+  geom_hline(yintercept=1, linetype="dashed", color = "black") +
+  geom_text(aes(Mutated_Gene, HR+2), nudge_x = 0.35, nudge_y = 0) +
+  geom_pointrange(size = 0.75, stat = "identity", shape = 19,
+                  # fill = "white",
+                  aes(x = Mutated_Gene, ymin = Lower_CI, ymax = Upper_CI, y = HR, color = sig_color)) +
+  scale_color_manual(values = c("1" = "#1b7837", "2" = "#762a83"))+
+  ylab("Hazard Ratio\n(multi-mut vs. 1 mut)")+
+  # ylim(0,11.5)+
+  theme_cowplot() +
+  theme(legend.position = "none",
+        axis.title.y=element_blank()) +
   coord_flip()
 
-ggsave(filename = "~/Desktop/MetaAML_results/Figure_2/Supplimental/individual_gene_HR_forrest_plot_de_novo.pdf", dpi = 300, width = 9, height = 6, units = "in")
+ggsave(filename = "~/Desktop/Majeti_Lab/Manuscripts/Meta_AML/Final_submission_materials/Nat_Comm/Revisions/Comment_4/multi_mut_survival_forrest_plot.pdf", dpi = 300, width = 4, height = 3, units = "in")
+
+
+
+
+### mutation category analysis ###
+convergent_functional_category = final_data_matrix_2_alt %>%
+  group_by(mutation_category) %>%
+  count(Sample, sort = TRUE) %>%
+  subset(n>0) %>%
+  na.omit() %>%
+  distinct()
+# convergent_functional_category$mutation_category = NULL
+# names(convergent_functional_category)[names(convergent_functional_category) == "n"] = "n_cat_muts"
+# convergent_functional_category = distinct(convergent_functional_category)
+
+# add the mutational categoty data
+convergent_clinical_merged_2 = convergent_clinical_merged %>%
+  select(Sample, BM_blast_percent, PB_blast_percent, WBC, Hemoglobin, LDH, Platelet, Age, Censor, Time_to_OS) %>%
+  unique()
+
+convergent_clinical_merged_cat = left_join(convergent_clinical_merged_2, convergent_functional_category, by = "Sample")
+convergent_clinical_merged_cat = convergent_clinical_merged_cat %>%
+  select(Sample, BM_blast_percent, PB_blast_percent, WBC, Hemoglobin, LDH, Platelet, Age, Censor, Time_to_OS, mutation_category, n) %>%
+  unique()
+
+convergent_categories = final_data_matrix_2_alt %>%
+  group_by(mutation_category) %>%
+  count(Sample, sort = TRUE) %>%
+  distinct(mutation_category) %>%
+  na.omit()
+
+variable_df_list_2 = list()
+forest_plot_data_list_2 = list()
+
+k = 1
+for(i in 1:nrow(convergent_categories)){
+  sub_dat_final = convergent_clinical_merged_cat %>%
+    subset(mutation_category == convergent_categories$mutation_category[i]) %>%
+    distinct(Sample, BM_blast_percent, PB_blast_percent, WBC, Hemoglobin, LDH, Platelet, Age, Censor, Time_to_OS, n)
+  
+  sub_dat_final$n = ifelse(sub_dat_final$n>1, ">1", "1")
+  
+  if(length(which(sub_dat_final$n != 1)) > 9){
+    l = 1
+    for(j in 2:8){
+      # calculate a p-value and effect size for the difference in clinical feaures based on number of mutations
+      # need to dynamically chage the column name for the variable of interest in order to calculate the effect size. will change back
+      col_name = as.character(colnames(sub_dat_final[j])[j])
+      names(sub_dat_final)[names(sub_dat_final) == col_name] <- "Variable"
+      
+      sub_dat_final[[j]] = as.numeric(sub_dat_final[[j]])
+      
+      # calculate effect sizes for clinical correlates
+      p_val =  wilcox.test(sub_dat_final[[j]] ~ sub_dat_final$n, alternative = "two.sided")$p.value
+      
+      effect_size = cohens_d(data = sub_dat_final, Variable ~ n)$effsize
+      effect_size_ci = cohens_d(data = sub_dat_final, Variable ~ n, ci = TRUE)
+      
+      # n_n1 = as.numeric(length(which(sub_dat_final$n == ">1")))
+      # n_n2 = as.numeric(length(which(sub_dat_final$n == "1")))
+      # effect_size_ci = psych::cohen.d.ci(d = effect_size, n = n, n1 = n_n1, n2 = n_n2)
+      
+      variable_df <- data.frame(matrix(NA, nrow = 1, ncol = 6))
+      names(variable_df) <- c("Variable", "Mutated_Category", "effect_size", "CI_lower", "CI_upper", "p_value")
+      
+      variable_df[1,1] <- paste(col_name)
+      variable_df[1,2] <- convergent_categories$mutation_category[i]
+      variable_df[1,3] <- effect_size
+      variable_df[1,4] <- effect_size_ci$conf.low[1]
+      variable_df[1,5] <- effect_size_ci$conf.high[1]
+      variable_df[1,6] <- p_val
+      
+      # Add each list in the loop to a list of lists and rename column
+      variable_df_list_1[[l]] = variable_df 
+      l = l + 1 
+      
+      names(sub_dat_final)[names(sub_dat_final) == "Variable"] = col_name
+      
+    }
+    variable_df_list_1_temp = do.call(rbind, variable_df_list_1)
+    variable_df_list_1_temp = variable_df_list_1_temp %>%
+      mutate(q_val = p.adjust(variable_df_list_1_temp$p_value))
+    
+    variable_df_list_2[[k]] = variable_df_list_1_temp
+    k=k+1
+    
+    # calculate hazard ratios and confidence intervals for survival outcomes
+    sub_dat_final$Censor = as.numeric(sub_dat_final$Censor)
+    
+    # run the Cox model
+    model <- coxph( Surv(Time_to_OS, Censor) ~ n,
+                    data = sub_dat_final )
+    
+    # extract the informative data from the survival model
+    array_dat = summary(model)$conf.int[1:4]
+    array_dat[5] = convergent_categories$mutation_category[i]
+    
+    # extract the log-rank p-value for the individual comparisons
+    array_dat[6] = summary(model)$sctest[3]
+    array_dat = array_dat[-2]
+    
+    forest_plot_data <- data.frame("Variable" = "Survival", "Mutated_Category" = array_dat[4], "HR" = array_dat[1], "Lower_CI" = round(as.numeric(array_dat[2]),2), "Upper_CI" = round(as.numeric(array_dat[3]),2), "log_rank_p" = array_dat[5])
+    
+    forest_plot_data_list_2[[i]] = forest_plot_data
+    
+  }
+  
+}
+# bind all of the clinical outcomes data and correct for FDR
+forest_plot_data_list_2_all = do.call(rbind, forest_plot_data_list_2)
+forest_plot_data_list_2_all$q_val = p.adjust(forest_plot_data_list_2_all$log_rank_p)
+
+# bind all of the clinical correlates data
+variable_df_list_2_all <- do.call(rbind, variable_df_list_2)
+variable_df_list_all$sig = NA
+for(i in 1:nrow(variable_df_list_2_all)){
+  if(variable_df_list_2_all$q_val[i] > 0.3 ){
+    variable_df_list_2_all$sig[i] = "q > 0.3"
+  }
+  if(variable_df_list_2_all$q_val[i] < 0.3 & variable_df_list_2_all$q_val[i] > 0.1 & variable_df_list_all$p_value[i] < 0.05){
+    variable_df_list_2_all$sig[i] = "q < 0.3"
+  }
+  if(variable_df_list_2_all$q_val[i] < 0.1 & variable_df_list_2_all$p_value[i] < 0.05){
+    variable_df_list_2_all$sig[i] = "q < 0.1"
+  }
+}
+
+
+# order the factors
+variable_df_list_2_all$Variable = factor(variable_df_list_2_all$Variable, levels=c('WBC','Hemoglobin','Platelet','LDH', 'BM_blast_percent', 'PB_blast_percent', 'Age'))
+
+# plot the discrete results
+p3 = ggplot(variable_df_list_2_all, aes(x = Mutated_Category, y = effect_size, label = p_value)) +
+  geom_hline(yintercept=0, linetype = "dashed", color = "black") +
+  theme_cowplot() +
+  geom_pointrange(size = 0.75, stat = "identity", 
+                  aes(x = Mutated_Category, ymin = CI_lower, ymax = CI_upper, y = effect_size, color = sig)) +
+  scale_color_manual(values = c("q < 0.3" = "#1F968BFF", "q < 0.1" = "#482677FF", "q > 0.3" = "grey")) +
+  ylab("Effect Size (multi-mut vs. 1 mut)")+
+  xlab("")+
+  theme(legend.position = "right", legend.title = element_blank(),
+        axis.title.y=element_blank()) +
+  coord_flip() +
+  xlim(rev(levels(factor(variable_df_list_2_all$Mutated_Category))))
+
+p3 = p3 + facet_grid(. ~ Variable) +
+  theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust = 1)) +
+  theme(strip.background = element_rect(colour="black", fill="white",
+                                        size=1.5, linetype="solid"))
+
+ggsave(filename = "~/Desktop/Majeti_Lab/Manuscripts/Meta_AML/Final_submission_materials/Nat_Comm/Revisions/Comment_4/multi_category_mut_clinical_features_discrete.pdf", dpi = 300, width = 13, height = 2.5, units = "in") 
+
+# vizualize all of the survival hazard ratios
+
+forest_plot_data_list_2_all$sig_color = 0
+
+for(i in 1:nrow(forest_plot_data_list_2_all)){
+  if(forest_plot_data_list_2_all$log_rank_p[i] < 0.05 & forest_plot_data_list_2_all$HR[i] < 1){
+    forest_plot_data_list_2_all$sig_color[i] = 1
+  }
+  if(forest_plot_data_list_2_all$log_rank_p[i] < 0.05 & forest_plot_data_list_2_all$HR[i] > 1){
+    forest_plot_data_list_2_all$sig_color[i] = 2
+  }
+}
+
+forest_plot_data_list_2_all$sig_color = as.factor(forest_plot_data_list_2_all$sig_color)
+forest_plot_data_list_2_all$sig_color = as.factor(forest_plot_data_list_2_all$sig_color)
+forest_plot_data_list_2_all = subset(forest_plot_data_list_2_all, forest_plot_data_list_2_all$Upper_CI != "Inf")
+forest_plot_data_list_2_all$categories <- reorder(forest_plot_data_list_2_all$categories, forest_plot_data_list_2_all$HR)
+
+
+forest_plot_data_list_2_all$p_text = NA
+for(i in 1:nrow(forest_plot_data_list_2_all)){
+  if(forest_plot_data_list_2_all$log_rank_p[i] < 0.05){
+    forest_plot_data_list_2_all$p_text[i] = forest_plot_data_list_2_all$log_rank_p[i]
+  }
+}
+forest_plot_data_list_2_all$q_text = NA
+for(i in 1:nrow(forest_plot_data_list_2_all)){
+  if(forest_plot_data_list_2_all$q_val[i] < 0.5){
+    forest_plot_data_list_2_all$q_text[i] = forest_plot_data_list_2_all$q_val[i]
+  }
+}
+
+forest_plot_data_list_2_all$p_text = as.numeric(forest_plot_data_list_2_all$p_text)
+forest_plot_data_list_2_all$q_text = as.numeric(forest_plot_data_list_2_all$q_text)
+
+forest_plot_data_list_2_all$p_text = round(forest_plot_data_list_2_all$p_text, 3)
+forest_plot_data_list_2_all$q_text = round(forest_plot_data_list_2_all$q_text, 2)
+
+for(i in 1:nrow(forest_plot_daforest_plot_data_list_2_allta_list_all)){
+  if(forest_plot_data_list_2_all$log_rank_p[i] < 0.01){
+    forest_plot_data_list_2_all$p_text[i] = "p < 0.01"
+  }
+  if(forest_plot_data_list_2_all$log_rank_p[i] >= 0.01 & forest_plot_data_list_2_all$log_rank_p[i] <= 0.05){
+    forest_plot_data_list_2_all$p_text[i] = paste("p =", paste(forest_plot_data_list_2_all$p_text[i]))
+  }
+}
+
+forest_plot_data_list_2_all$p_q_text = paste(forest_plot_data_list_2_all$p_text, "; q = ", forest_plot_data_list_2_all$q_text, sep = "")
+
+for(i in 1:nrow(forest_plot_data_list_2_all)){
+  if(forest_plot_data_list_2_all$log_rank_p[i] > 0.05){
+    forest_plot_data_list_2_all$p_q_text[i] = ""
+  }
+  if(forest_plot_data_list_2_all$log_rank_p[i] > 0.05){
+    forest_plot_data_list_2_all$p_q_text[i] = ""
+  }
+}
+
+forest_plot_data_list_2_all$HR = as.numeric(forest_plot_data_list_2_all$HR)
+forest_plot_data_list_2_all$Lower_CI = as.numeric(forest_plot_data_list_2_all$Lower_CI)
+forest_plot_data_list_2_all$Upper_CI = as.numeric(forest_plot_data_list_2_all$Upper_CI)
+
+forest_plot_data_list_2_all$Mutated_Category <- factor(forest_plot_data_list_2_all$Mutated_Category, levels = forest_plot_data_list_2_all$Mutated_Category[order(forest_plot_data_list_2_all$HR)])
+
+p4 = ggplot(forest_plot_data_list_2_all, aes(x = reorder(Mutated_Category, -HR), y = HR, label = p_q_text)) +
+  geom_hline(yintercept=1, linetype="dashed", color = "black") +
+  geom_text(aes(Mutated_Category, HR+.35), nudge_x = 0.35, nudge_y = 0) +
+  geom_pointrange(size = 0.75, stat = "identity", shape = 19,
+                  # fill = "white",
+                  aes(x = Mutated_Category, ymin = Lower_CI, ymax = Upper_CI, y = HR, color = sig_color)) +
+  scale_color_manual(values = c("1" = "#1b7837", "2" = "#762a83"))+
+  ylab("Hazard Ratio\n(multi-mut vs. 1 mut)")+
+  # ylim(0,11.5)+
+  theme_cowplot() +
+  theme(legend.position = "none",
+        axis.title.y=element_blank()) +
+  coord_flip()
+
+ggsave(filename = "~/Desktop/Majeti_Lab/Manuscripts/Meta_AML/Final_submission_materials/Nat_Comm/Revisions/Comment_4/multi_category_mut_survival_forrest_plot.pdf", dpi = 300, width = 4, height = 3, units = "in")
+
+# ggarrange(p1, p2, p3, p4,
+# ncol = 2,
+#           # legend = "right",
+#           align = "hv")
+
+library(patchwork)
+p = (p1 + p2) / (p3 + p4) 
+
+p1 + p2 + p3 + p4 +plot_layout(widths = c(5, 1), heights = c(1,1))
+
+ggsave(filename = "~/Desktop/Majeti_Lab/Manuscripts/Meta_AML/Final_submission_materials/Nat_Comm/Revisions/Comment_4/convergent_panel_2.pdf", dpi = 300, width = 20, height = 7.5, units = "in")
+
+
 

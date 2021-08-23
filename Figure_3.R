@@ -1,35 +1,26 @@
 # ========================================================================================================================================== #
 # Figure_3.R
 # Author : Brooks Benard, bbenard@stanford.edu
-# Date: 03/16/2021
+# Date: 08/23/2021
 # Description: This script will perform survival analyses based on VAF thresholds as seen in Figure 3 of the manuscript Benard et al. "Clonal architecture and variant allele frequency correlate with clinical outcomes and drug response in acute myeloid leukemia".
 # ========================================================================================================================================== #
 
-# libraries
-if (!require('scales')) install.packages('scales'); library('scales')
-if (!require('ggplot2')) install.packages('ggplot2'); library('ggplot2')
-if (!require('readxl')) install.packages('readxl'); library('readxl')
-if (!require('cowplot')) install.packages('cowplot'); library('cowplot')
-if (!require('reshape2')) install.packages('reshape2'); library('reshape2')
-if (!require('plyr')) install.packages('plyr'); library('plyr')
-if (!require('dplyr')) install.packages('dplyr'); library('dplyr')
-if (!require('UpSetR')) install.packages('UpSetR'); library('UpSetR')
-if (!require('muhaz')) install.packages('muhaz'); library('muhaz')
-if (!require('data.table')) install.packages('data.table'); library('data.table')
-if (!require('stringr')) install.packages('stringr'); library('stringr')
-if (!require('ggrepel')) install.packages('ggrepel'); library('ggrepel')
-if (!require('ggpubr')) install.packages('ggpubr'); library('ggpubr')
-if (!require('RCurl')) install.packages('RCurl'); library('RCurl')
-if (!require('muhaz')) install.packages('muhaz'); library('muhaz')
-if (!require('survival')) install.packages('survival'); library('survival')
-if (!require('survMisc')) install.packages('survMisc'); library('survMisc')
-if (!require('survminer')) install.packages('survminer'); library('survminer')
-if (!require('ggsci')) install.packages('ggsci'); library('ggsci')
-if (!require('survivalAnalysis')) install.packages('survivalAnalysis'); library('survivalAnalysis')
-if (!require('maxstat')) install.packages('maxstat'); library('maxstat')
-if (!require('rstatix')) install.packages('rstatix'); library('rstatix')
-if (!require('psych')) install.packages('psych'); library('psych')
+# ================ #
+# Load packages ####
+# ================ #
+# Package names
+packages <- c("ggplot2", "tydyr" , "dplyr", "cometExactTest", "discover", "stringr", "maditr", "reshape2", "data.table", "epitools", "corrplot", "plyr", "muhaz", "reshape", "survival", "survivalAnalysis", "survMisc", "survminer", "ggsci", "vegan", "ggrepel", "ggforce", "rstatix", "effsize", "psych", "maxstat", "RCurl", "ggpubr", "UpSetR", "cowplot", "readxl", "scales", "rlist")
 
+# Install packages not yet installed
+installed_packages <- packages %in% rownames(installed.packages())
+if (any(installed_packages == FALSE)) {
+  install.packages(packages[!installed_packages])
+}
+
+# Packages loading
+invisible(lapply(packages, library, character.only = TRUE))
+
+# create directories
 dir.create("~/Desktop/MetaAML_results/Figure_3")
 dir.create("~/Desktop/MetaAML_results/Figure_3/Supplimental")
 
@@ -349,6 +340,26 @@ ggsave(filename = "~/Desktop/MetaAML_results/Figure_3/Supplimental/all_vaf_corre
 
 
 # now plot the VAF distribution per gene colored by if the mutation is above or below the median VAF for that gene
+
+for(i in 1:nrow(final_data_matrix_2)){
+  if(final_data_matrix_2$Gene[i] == "FLT3" & final_data_matrix_2$variant_type[i] == "ITD"){
+    final_data_matrix_2$Gene[i] <- "FLT3-ITD"
+  }
+  if(final_data_matrix_2$Gene[i] == "FLT3" & final_data_matrix_2$variant_type[i] == "SNV"){
+    final_data_matrix_2$Gene[i] <- "FLT3-TKD"
+  }
+  if(final_data_matrix_2$Gene[i] == "FLT3" & final_data_matrix_2$variant_type[i] == "Deletion"){
+    final_data_matrix_2$Gene[i] <- "FLT3-TKD"
+  }
+  if(final_data_matrix_2$Gene[i] == "FLT3" & final_data_matrix_2$variant_type[i] == "INDEL"){
+    final_data_matrix_2$Gene[i] <- "FLT3-ITD"
+  }
+  if(final_data_matrix_2$Gene[i] == "FLT3" & final_data_matrix_2$variant_type[i] == "other"){
+    final_data_matrix_2$Gene[i] <- "FLT3-TKD"
+  }
+}
+
+genes = unique(final_data_matrix_2$Gene)
 genes = unique(final_data_matrix_2$Gene)
 
 final_data_matrix_2$median_threshold = NA
@@ -383,7 +394,7 @@ threshold_list_all$Gene <- with(threshold_list_all, reorder(Gene, -VAF_CN_correc
 p = ggplot(threshold_list_all, aes(x=Gene, y=VAF_CN_corrected)) + 
   theme_cowplot(font_size = 10) +
   geom_boxplot(notch=F, outlier.colour = "white", color = "#374E55FF", fill = "lightgrey") +
-  geom_jitter(aes(fill = median_threshold_NA), color = "black", shape = 21, position=position_jitter(0.15), size = 1.25) +
+  geom_jitter(aes(fill = median_threshold_NA), alpha = 0.5, color = "black", shape = 21, position=position_jitter(0.15), size = 1.25) +
   scale_fill_manual(values = c("#cb181d", "#3690c0")) +
   labs(title = NULL) +
   ylab(label = "VAF") +
@@ -687,14 +698,17 @@ for(i in 1:nrow(var2_adj_list)){
 }
 
 
+var2_adj_list$Variable = gsub("BM_blast_percent", "BM blast %", var2_adj_list$Variable)
+var2_adj_list$Variable = gsub("PB_blast_percent", "PB blast %", var2_adj_list$Variable)
+
 # order the factors
-var2_adj_list$Variable = factor(var2_adj_list$Variable, levels=c('WBC','Hemoglobin','Platelet','LDH', 'BM_blast_percent', 'PB_blast_percent', 'Age'))
+var2_adj_list$Variable = factor(var2_adj_list$Variable, levels=c('WBC','Hemoglobin','Platelet','LDH', 'BM blast %', 'PB blast %', 'Age'))
 
 # plot the discrete results
 p = ggplot(var2_adj_list, aes(x = Mutated_Gene, y = effect_size, label = p_value)) +
   geom_hline(yintercept=0, linetype = "dashed", color = "black") +
   theme_cowplot() +
-  geom_pointrange(size = 0.75, stat = "identity", 
+  geom_pointrange(size = 0.75, stat = "identity", alpha = 0.75,
                   aes(x = Mutated_Gene, ymin = CI_lower, ymax = CI_upper, y = effect_size, color = sig)) +
   scale_color_manual(values = c("q < 0.2" = "#FDE725FF", "q < 0.1" = "#1F968BFF", "q < 0.05" = "#482677FF", "q > 0.2" = "grey")) +
   ylab("Effect Size (high VAF vs. low VAF)")+
@@ -706,19 +720,6 @@ p = ggplot(var2_adj_list, aes(x = Mutated_Gene, y = effect_size, label = p_value
 
 p + facet_grid(. ~ Variable)
 
-# library(grid)
-# variables = c("Age", "Platelet", "Hemoglobin", "WBC", "LDH", "BM_blast_percent", "PB_blast_percent")
-# colors = c("#bdbdbd",  "#fb6a4a", "#fe9929", "#d4b9da", "#238443", "#e6ab02", "#8dd3c7")
-# g <- ggplot_gtable(ggplot_build(p))
-# strip_t <- which(grepl('strip-t', g$layout$name))
-# fills <- c("#d4b9da","#fe9929","#fb6a4a","#238443", "#e6ab02", "#8dd3c7", "lightgrey")
-# k <- 1
-# for (i in strip_t) {
-#   j <- which(grepl('rect', g$grobs[[i]]$grobs[[1]]$VariableOrder))
-#   g$grobs[[i]]$grobs[[1]]$Variable[[j]]$gp$fill <- fills[k]
-#   k <- k+1
-# }
-# grid.draw(g)
 
 p + facet_grid(. ~ Variable) +
   theme(strip.background = element_rect(colour="black", fill="white",
@@ -806,6 +807,10 @@ for(i in 1:nrow(genes)){
       }
     }
     
+    
+    n_over = length(which(final_data_matrix_2_sub2$vaf_threshold == "over"))
+    n_under  = length(which(final_data_matrix_2_sub2$vaf_threshold == "under"))
+    
     if(n_distinct(final_data_matrix_2_sub2$vaf_threshold) > 1){
       
       # summarize results from a Cox model
@@ -826,7 +831,9 @@ for(i in 1:nrow(genes)){
       array_dat[6] = summary(model)$sctest[3]
       array_dat = array_dat[-2]
       
-      forest_plot_data <- data.frame("Gene" = array_dat[4], "HR" = array_dat[1], "Lower_CI" = round(as.numeric(array_dat[2]),2), "Upper_CI" = round(as.numeric(array_dat[3]),2), "log_rank_p" = array_dat[5], "VAF_threshold" = threshold)
+      n_pts = ifelse(array_dat[1] < 1, n_under, n_over)
+      
+      forest_plot_data <- data.frame("Gene" = array_dat[4], "HR" = array_dat[1], "Lower_CI" = round(as.numeric(array_dat[2]),2), "Upper_CI" = round(as.numeric(array_dat[3]),2), "log_rank_p" = array_dat[5], "VAF_threshold" = threshold, "n_pts" = n_pts)
       
       results_list[[n]] <- forest_plot_data
       n=n+1   
@@ -842,7 +849,7 @@ for(i in 1:nrow(genes)){
         
         p_hr = paste(p, "\n", hr, sep = "")
         
-        cohorts <- c("over", "under")
+        cohorts <- c("under", "over")
         
         title <- paste(threshold, "VAF\nthreshold",sep = " ")
         
@@ -865,7 +872,7 @@ for(i in 1:nrow(genes)){
                                 risk.table.y.text = T,
                                 break.time.by = 5,
                                 risk.table.pos = c("out"),
-                                palette = c("over" = "#6A6599FF",  "under" = "#80796BFF"),
+                                palette = c("#80796BFF", "#6A6599FF"),
                                 xlab = "Years",
                                 ylim = c(0, 1.0),
                                 ylab =  "Survival Probability",
@@ -880,7 +887,12 @@ for(i in 1:nrow(genes)){
                                 legend.title = paste(title),
                                 legend = "right",
                                 title = gene)
-
+        print(plot_list[[i]])
+        png(filename = paste("~/Desktop/MetaAML_results/Figure_3/Supplimental/optimal_vaf_thresholds/", gene, ".png", sep = ""), res = 300, width = 5, height = 5, units = "in")
+        #
+        plot_list[[i]]
+        print(plot_list[[i]])
+        dev.off()
       }
     }
   }
@@ -895,8 +907,8 @@ write.csv(temp_final,  file = "~/Desktop/MetaAML_results/Figure_3/Supplimental/o
 plot_list = list.clean(plot_list)
 
 plots = arrange_ggsurvplots(plot_list, print = FALSE,
-                            ncol = 3, nrow = 3)
-ggsave("~/Desktop/MetaAML_results/Figure_3/Supplimental/optimal_VAF_survival_grid.pdf", plots, width = 13.5, height = 13.5)
+                            ncol = 6, nrow = 2)
+ggsave("~/Desktop/MetaAML_results/Figure_3/Supplimental/optimal_VAF_survival_grid.pdf", plots, width = 25, height = 10)
 
 # forrest plot of HRs ####
 temp_final_hr = as.data.frame(do.call(rbind, results_list))
@@ -981,6 +993,22 @@ ggplot(temp_final_hr, aes(x = reorder(Gene, -HR), y = HR, label = temp_final_hr$
   coord_flip()
 
 
+ggplot(temp_final_hr, aes(x = reorder(Gene, -HR), y = HR, label = p_q_text)) +
+  geom_hline(yintercept=1, linetype="dashed", color = "black") +
+  geom_text(aes(Gene, Upper_CI), hjust = 0, nudge_y = 0.5) +
+  geom_point(aes(size = n_pts, color = sig_color), shape = 19, alpha = .9) +
+  geom_segment(data = temp_final_hr, aes(y = Lower_CI, yend = Upper_CI, x = Gene, xend = Gene, col= sig_color), size = 0.5) +
+  scale_color_manual(values = c("0" = "grey", "1" = "#1b7837", "2" = "#762a83"))+
+  ylab("Hazard Ratio\n(high VAF vs. low VAF)")+
+  theme_cowplot() +
+  scale_size_area(max_size = 5,breaks=c(25,50,100,200,300)) +
+  theme(legend.position = c(0.6, .2),
+        axis.title.y=element_blank()) +
+  coord_flip() +
+  guides(color = FALSE,
+         size =  guide_legend(override.aes=list(colour="lightgrey"), title = "n. patients over\nVAF threshold"))
+
+
 ggsave(filename = "~/Desktop/MetaAML_results/Figure_3/gene_vaf_optimal_vaf_thresholds_hr_forest_plot_de_novo.pdf", dpi = 300, width = 5, height = 6, units = "in")
 
 
@@ -1011,6 +1039,7 @@ for(i in 1:nrow(hr_comparision)){
   }
 }
 
+
 p =  ggplot(hr_comparision, aes(x=HR, y = VAF_HR, color = sig)) +
         theme_cowplot() +
   geom_segment(aes(x = 0, xend =4, y = 1, yend = 1),
@@ -1019,7 +1048,7 @@ p =  ggplot(hr_comparision, aes(x=HR, y = VAF_HR, color = sig)) +
   # geom_errorbarh(aes(xmin = gene_lower_95, xmax = gene_upper_95), alpha = .15) +
         geom_point(aes(size = VAF_threshold), alpha = .9) +
   geom_point(aes(size = VAF_threshold), shape = 1, colour = "black") +
-        scale_colour_manual(values = c("q < 0.1"= "#8073ac","q > 0.1"="#737373")) + 
+        scale_colour_manual(values = c("q < 0.1"= "#b2182b","q > 0.1"="grey")) + 
         geom_label_repel(aes(label=label),size = 3, force = 25, show_guide = F, max.overlaps = 15) +
         coord_cartesian(ylim=c(0,5.5), xlim=c(0,4)) +
         ylab(label= "Hazard Ratio\n(high VAF vs. low VAF)") +
@@ -1071,7 +1100,9 @@ for(i in 1:nrow(es_comparision)){
   }
 }
 
-es_comparision$Variable = factor(es_comparision$Variable, levels = c("PB_blast_percent", "WBC"))
+es_comparision$Variable = gsub("PB_blast_percent", "PB blast %", es_comparision$Variable)
+
+es_comparision$Variable = factor(es_comparision$Variable, levels = c("WBC", "PB blast %"))
 
 p = ggplot(es_comparision, aes(x=effect_size, y = effect_size_vaf, color = factor(sig_color))) +
   theme_cowplot() +
@@ -1079,13 +1110,13 @@ p = ggplot(es_comparision, aes(x=effect_size, y = effect_size_vaf, color = facto
   geom_vline(xintercept = 0,  linetype = "dashed", color = "lightgrey") +
   geom_point(aes(size = n_mut), alpha = 1) +
   geom_point(aes(size = n_mut), shape = 1, colour = "black") +
-  scale_colour_manual(values = c("WBC q < 0.1"= "#d4b9da","PB q < 0.1"="#8dd3c7", "q > 0.1" = "#737373")) + 
-  geom_label_repel(aes(label=label),size = 3, force = 50, show_guide = F, max.overlaps = 15) +
+  scale_colour_manual(values = c("WBC q < 0.1"= "#d4b9da","PB q < 0.1"="#8dd3c7", "q > 0.1" = "grey")) + 
+  geom_label_repel(aes(label=label),size = 3, force = 50, show_guide = F, max.overlaps = 10) +
   ylab(label= "Effect Size\n(high VAF vs. low VAF)") +
   xlab(label= "Effect Size\n(Mutated vs. WT)") +
   theme(legend.position="right") 
 
-g = guide_legend(override.aes=list(colour="grey"), "n. pts")
+g = guide_legend(override.aes=list(colour="grey"), "n. patients")
 h = guide_legend("VAF effect size")
 
 p + facet_wrap(. ~ Variable, ncol = 1, nrow = 2) + guides(size = g, color = FALSE) +

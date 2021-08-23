@@ -1,31 +1,26 @@
 # ========================================================================================================================================== #
 # Figure_4.R
 # Author : Brooks Benard, bbenard@stanford.edu
-# Date: 09/03/2020
+# Date: 08/23/2021
 # Description: This script analyzes pairwise mutation VAF relationships, mutation ordering in AML, and survival associations based on the ordering of pairwise and category ordering as seen in Figure 4 of the manuscript Benard et al. "Clonal architecture and variant allele frequency correlate with clinical outcomes and drug response in acute myeloid leukemia".
 # ========================================================================================================================================== #
 
-# packages
-if (!require('ggplot2')) install.packages('ggplot2'); library('ggplot2')
-if (!require('readxl')) install.packages('readxl'); library('readxl')
-if (!require('cowplot')) install.packages('cowplot'); library('cowplot')
-if (!require('reshape2')) install.packages('reshape2'); library('reshape2')
-if (!require('plyr')) install.packages('plyr'); library('plyr')
-if (!require('dplyr')) install.packages('dplyr'); library('dplyr')
-if (!require('data.table')) install.packages('data.table'); library('data.table')
-if (!require('survival')) install.packages('survival'); library('survival')
-if (!require('survMisc')) install.packages('survMisc'); library('survMisc')
-if (!require('survminer')) install.packages('survminer'); library('survminer')
-if (!require('ggridges')) install.packages('ggridges'); library('ggridges')
-if (!require('ggsci')) install.packages('ggsci'); library('ggsci')
-if (!require('gridExtra')) install.packages('gridExtra'); library('gridExtra')
-if (!require('ggplotify')) install.packages('ggplotify'); library('ggplotify')
-if (!require('survivalAnalysis')) install.packages('survivalAnalysis'); library('survivalAnalysis')
-if (!require('corrplot')) install.packages('corrplot'); library('corrplot')
-if (!require('vegan')) install.packages('vegan'); library('vegan')
-if (!require('ggpubr')) install.packages('ggpubr'); library('ggpubr')
-if (!require('scales')) install.packages('scales'); library('scales')
+# ================ #
+# Load packages ####
+# ================ #
+# Package names
+packages <- c("ggplot2", "tydyr" , "dplyr", "cometExactTest", "discover", "stringr", "maditr", "reshape2", "data.table", "epitools", "corrplot", "plyr", "muhaz", "reshape", "survival", "survivalAnalysis", "survMisc", "survminer", "ggsci", "vegan", "ggrepel", "ggforce", "rstatix", "effsize", "psych", "maxstat", "RCurl", "ggpubr", "UpSetR", "cowplot", "readxl", "scales", "rlist", "ggplotify", "ggridges", "gridExtra")
 
+# Install packages not yet installed
+installed_packages <- packages %in% rownames(installed.packages())
+if (any(installed_packages == FALSE)) {
+  install.packages(packages[!installed_packages])
+}
+
+# Packages loading
+invisible(lapply(packages, library, character.only = TRUE))
+
+# create directories
 dir.create("~/Desktop/MetaAML_results/Figure_4")
 dir.create("~/Desktop/MetaAML_results/Figure_4/Supplimental")
 

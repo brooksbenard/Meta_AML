@@ -1,32 +1,27 @@
 # ========================================================================================================================================== #
 # Figure_6.R
 # Author : Brooks Benard, bbenard@stanford.edu
-# Date: 09/01/2020
+# Date: 08/23/2021
 # Description: This script analyses if the VAF of a specific mutation correlates with sensitivity or resistance to different drugs in the Beat AML study
 # This script will download, process, and generate the restults as seen in Figure 6 of the manuscript Benard et al. "Clonal architecture and variant allele frequency correlate with clinical outcomes and drug response in acute myeloid leukemia".
 # ========================================================================================================================================== #
 
-# =================== #
-# Load libraries ####
-# =================== #
-if (!require('xlsx')) install.packages('xlsx'); library('xlsx')
-if (!require('scales')) install.packages('scales'); library('scales')
-if (!require('ggplot2')) install.packages('ggplot2'); library('ggplot2')
-if (!require('readxl')) install.packages('readxl'); library('readxl')
-if (!require('cowplot')) install.packages('cowplot'); library('cowplot')
-if (!require('reshape2')) install.packages('reshape2'); library('reshape2')
-if (!require('plyr')) install.packages('plyr'); library('plyr')
-if (!require('dplyr')) install.packages('dplyr'); library('dplyr')
-if (!require('UpSetR')) install.packages('UpSetR'); library('UpSetR')
-if (!require('muhaz')) install.packages('muhaz'); library('muhaz')
-if (!require('data.table')) install.packages('data.table'); library('data.table')
-if (!require('stringr')) install.packages('stringr'); library('stringr')
-if (!require('ggrepel')) install.packages('ggrepel'); library('ggrepel')
-if (!require('ggpubr')) install.packages('ggpubr'); library('ggpubr')
-if (!require('patchwork')) install.packages('patchwork'); library('patchwork')
-if (!require('rlist')) install.packages('rlist'); library('rlist')
-if (!require('ggridges')) install.packages('ggridges'); library('ggridges')
+# ================ #
+# Load packages ####
+# ================ #
+# Package names
+packages <- c("ggplot2", "tidyverse", "viridis", "viridisLite", "RColorBrewer", "tydyr", "dplyr", "cometExactTest", "discover", "stringr", "maditr", "reshape2", "data.table", "epitools", "corrplot", "plyr", "muhaz", "reshape", "survival", "survivalAnalysis", "survMisc", "survminer", "ggsci", "vegan", "ggrepel", "ggforce", "rstatix", "effsize", "psych", "maxstat", "RCurl", "ggpubr", "UpSetR", "cowplot", "readxl", "scales", "rlist", "ggplotify", "ggridges", "gridExtra", "magrittr", "stats", "patchwork", "xlsx")
 
+# Install packages not yet installed
+installed_packages <- packages %in% rownames(installed.packages())
+if (any(installed_packages == FALSE)) {
+  install.packages(packages[!installed_packages])
+}
+
+# Packages loading
+invisible(lapply(packages, library, character.only = TRUE))
+
+# create directores
 dir.create("~/Desktop/MetaAML_results/Figure_6")
 dir.create("~/Desktop/MetaAML_results/Figure_6/Supplimental")
 
@@ -825,7 +820,7 @@ drug_mutation_binary_function = function(sample_subset, individual_plots){
     geom_point(alpha = 0.75) + 
     geom_point(shape = 21, color = "darkgrey", alpha = 0.25) +
     geom_label_repel(aes(label=point_label), size = 3,  show_guide = F) +
-    scale_colour_manual(values = c("Sensitive"= "#b2182b", "Resistant"="#2166ac", "ns."="lightgrey")) + 
+    scale_colour_manual(values = c("Sensitive"= "#b2182b", "Resistant"="#2166ac", "ns."="grey")) + 
     theme(legend.position="right") +
     geom_hline(yintercept = 1.30103,  linetype = "dashed", color = "grey") +
     ylab(label= "-log10(FDR) q-value") +
@@ -833,12 +828,12 @@ drug_mutation_binary_function = function(sample_subset, individual_plots){
     labs(title = NULL) +
     theme(plot.title = element_text(color="black", size=20)) 
   
-  g = guide_legend("Number of\nsamples")
+  g = guide_legend(override.aes=list(colour="grey"), "Number of\nsamples")
   h = guide_legend("")
   
   p + guides(size = g, color = h) +
     annotate(geom="text", x = 100, y = 1.5, label="q < 0.1",
-             color="darkgrey")
+             color="grey")
   
   ggsave(filename = paste("~/Desktop/MetaAML_results/Figure_6/Supplimental/drug_vaf_correlation/binary/",sample_subset,"/binary_drug_results.pdf", sep = ""), dpi = 300, width = 7, height = 4.5, units = "in")
   

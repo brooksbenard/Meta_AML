@@ -1,7 +1,7 @@
 # ========================================================================================================================================== #
 # Figure_5.R
 # Author : Brooks Benard and Logan Leak, bbenard@stanford.edu; lleak@stanford.edu
-# Date: 09/01/2020
+# Date: 08/23/2021
 # Description: This script performes clonal analysis using PyClone and ClonEvol on aggregate TCGA and Beat AML samples
 # This script will download, process, and generate the restults as seen in Figure 5 (and associated suppliments) of the manuscript Benard et al. "Clonal architecture and variant allele frequency correlate with clinical outcomes and drug response in acute myeloid leukemia".
 # ========================================================================================================================================== #
@@ -34,41 +34,25 @@
 ######################################################
 # 1. Packages, libraries, and working directory   ####
 ######################################################
-if (!require('readxl')) install.packages('readxl'); library('readxl')
-if (!require('tidyverse')) install.packages('tidyverse'); library('tidyverse')
-if (!require('dplyr')) install.packages('dplyr'); library('dplyr')
-if (!require('viridis')) install.packages('viridis'); library('viridis')
-if (!require('viridisLite')) install.packages('viridisLite'); library('viridisLite')
-if (!require('ggplot2')) install.packages('ggplot2'); library('ggplot2')
-if (!require('ggpubr')) install.packages('ggpubr'); library('ggpubr')
-if (!require('survival')) install.packages('survival'); library('survival')
-if (!require('survminer')) install.packages('survminer'); library('survminer')
-if (!require('corrplot')) install.packages('corrplot'); library('corrplot')
-if (!require('RColorBrewer')) install.packages('RColorBrewer'); library('RColorBrewer')
-if (!require('magrittr')) install.packages('magrittr'); library('magrittr')
-if (!require('data.table')) install.packages('data.table'); library('data.table')
-if (!require('stats')) install.packages('stats'); library('stats')
-if (!require('gage')) install.packages('gage'); library('gage')
-if (!require('fgsea')) install.packages('fgsea'); library('fgsea')
-if (!require('GSA')) install.packages('GSA'); library('GSA')
-if (!require('MAGeCKFlute')) install.packages('MAGeCKFlute'); library('MAGeCKFlute')
-if (!require('cowplot')) install.packages('cowplot'); library('cowplot')
-if (!require('tidyverse')) install.packages('tidyverse'); library('tidyverse')
+# Package names
+packages <- c("ggplot2", "tidyverse", "viridis", "viridisLite", "RColorBrewer", "tydyr", "dplyr", "cometExactTest", "discover", "stringr", "maditr", "reshape2", "data.table", "epitools", "corrplot", "plyr", "muhaz", "reshape", "survival", "survivalAnalysis", "survMisc", "survminer", "ggsci", "vegan", "ggrepel", "ggforce", "rstatix", "effsize", "psych", "maxstat", "RCurl", "ggpubr", "UpSetR", "cowplot", "readxl", "scales", "rlist", "ggplotify", "ggridges", "gridExtra", "magrittr", "stats", "gage", "fgsea", "GSA", "MAGeCKFlute", "devtools", "gridBase", "igraph", "packcircles")
 
-# # The below are for the evolution analysis
-if (!require('devtools')) install.packages('devtools'); library('devtools')
-if (!require('gridBase')) install.packages('gridBase'); library('gridBase')
-if (!require('gridExtra')) install.packages('gridExtra'); library('gridExtra')
-if (!require('igraph')) install.packages('igraph'); library('igraph')
-if (!require('packcircles')) install.packages('packcircles'); library('packcircles')
+# Install packages not yet installed
+installed_packages <- packages %in% rownames(installed.packages())
+if (any(installed_packages == FALSE)) {
+  install.packages(packages[!installed_packages])
+}
+
+# Packages loading
+invisible(lapply(packages, library, character.only = TRUE))
+
 # Put last to avoid conflicts
 install_github('hdng/clonevol')
 library(clonevol)
 if (!require('vegan')) install.packages('vegan'); library('vegan')
 
 
-
-# Make directory dynamic per user
+# Make directories
 dir.create("~/Desktop/MetaAML_results/Figure_5")
 dir.create("~/Desktop/MetaAML_results/Figure_5/PyClone")
 setwd("~/Desktop/MetaAML_results/Figure_5/PyClone/")

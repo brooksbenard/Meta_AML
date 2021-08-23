@@ -1,28 +1,24 @@
 # ========================================================================================================================================== #
 # Figure_1.R
 # Author : Brooks Benard, bbenard@stanford.edu
-# Date: 03/16/2021
-# Description: Curation of multiple sequencing studies in AML into one dataframe for meta analysis of mutational and clinical correlations. This script will pull published data from AML sequencing studies, homogenize annotations and coding where possible, and plot an UpSet plot and oncoprint of the cohort as seen in Figure 1 (and related suppliments) of the manuscript Benard et al. "Clonal architecture and variant allele frequency correlate with clinical outcomes and drug response in acute myeloid leukemia".
+# Date: 08/23/2021
+# Description: This script will pull published data from AML sequencing studies, homogenize annotations and coding where possible, and plot an UpSet plot and oncoprint of the cohort as seen in Figure 1 (and related suppliments) of the manuscript Benard et al. "Clonal architecture and variant allele frequency correlate with clinical outcomes and drug response in acute myeloid leukemia".
 # ========================================================================================================================================== #
 
-# =================== #
-# Load libraries ####
-# =================== #
-if (!require('scales')) install.packages('scales'); library('scales')
-if (!require('ggplot2')) install.packages('ggplot2'); library('ggplot2')
-if (!require('readxl')) install.packages('readxl'); library('readxl')
-if (!require('cowplot')) install.packages('cowplot'); library('cowplot')
-if (!require('reshape2')) install.packages('reshape2'); library('reshape2')
-if (!require('plyr')) install.packages('plyr'); library('plyr')
-if (!require('dplyr')) install.packages('dplyr'); library('dplyr')
-if (!require('tidyr')) install.packages('tidyr'); library('tidyr')
-if (!require('UpSetR')) install.packages('UpSetR'); library('UpSetR')
-if (!require('muhaz')) install.packages('muhaz'); library('muhaz')
-if (!require('data.table')) install.packages('data.table'); library('data.table')
-if (!require('stringr')) install.packages('stringr'); library('stringr')
-if (!require('ggpubr')) install.packages('ggpubr'); library('ggpubr')
-if (!require('RCurl')) install.packages('RCurl'); library('RCurl')
-if (!require('reshape')) install.packages('reshape'); library('reshape')
+# ================ #
+# Load packages ####
+# ================ #
+# Package names
+packages <- c("ggplot2", "scales" , "readxl", "reshape2", "cowplot", "dplyr", "tidyr", "plyr", "UpSetR", "muhaz", "data.table", "ggpubr", "RCurl", "reshape", "survival", "survminer", "gsubfn")
+
+# Install packages not yet installed
+installed_packages <- packages %in% rownames(installed.packages())
+if (any(installed_packages == FALSE)) {
+  install.packages(packages[!installed_packages])
+}
+
+# Packages loading
+invisible(lapply(packages, library, character.only = TRUE))
 
 # =============================== #
 # make directory dynamic per user
@@ -556,7 +552,7 @@ BeatAML_survival2 <- dplyr::select(BeatAML_sample_data_types,  LabId, PatientId,
 
 # Stanford Majeti lab
 # survival data
-Stanford_survival <- read_excel("~/Desktop/Majeti_Lab/Data/Combined_mutation_occurence/151102_Clinical Outcomes of All Patients without_PHI.xlsx")
+Stanford_survival <- read_excel("~/Desktop/Majeti_Lab/Data/Old_stuff/Combined_mutation_occurence/151102_Clinical Outcomes of All Patients without_PHI.xlsx")
 # remove empty patient rows
 Stanford_survival <- Stanford_survival[1:133,]
 Stanford_survival2 <- dplyr::select(Stanford_survival, `Patient SU Number`, `Overall Survival (Event = Death)`, `Duration from diagnosis to D1`, Gender, `Age at Diagnosis`, Cytogenetics, 15)
@@ -1705,6 +1701,976 @@ dev.off()
 
 
 #### Supplimental ####
+# treatment histories ####
+# find the treatment data for cohorts where avaliable. Then, homogenize all of the therapy labels into broad categories for induction therapy and potential bone marrow transplant
+install.packages('alluvial'); library('alluvial')
+# Papaemmanuil
+Papaemmanuil_treatment = read.table("~/Desktop/MetaAML_results/raw_data/AML_knowledge_bank_data_clinical.txt", stringsAsFactors = F)
+Papaemmanuil_treatment = Papaemmanuil_treatment %>%
+  select(PDID, Study1, VPA, ATRA_arm, TPL_o, TPL_type, OS) 
+
+Papaemmanuil_treatment$Induction = "ICE"
+
+for(i in 1:nrow(Papaemmanuil_treatment)){
+  if(Papaemmanuil_treatment$VPA[i] == 1 & Papaemmanuil_treatment$ATRA_arm[i] == 1){
+    Papaemmanuil_treatment$Induction[i] = "ICE+VPA+ATRA"
+  }
+  if(Papaemmanuil_treatment$VPA[i] == 0 & Papaemmanuil_treatment$ATRA_arm[i] == 1){
+    Papaemmanuil_treatment$Induction[i] = "ICE+ATRA"
+  }
+}
+
+Papaemmanuil_treatment$TPL_type[is.na(Papaemmanuil_treatment$TPL_type)] <- "None"
+
+names(Papaemmanuil_treatment)[c(6:7)] = c("Transplant_type", "Survival")
+
+for(i in 1:nrow(Papaemmanuil_treatment)){
+  if(Papaemmanuil_treatment$Transplant_type[i] %in% c("ALLO", "FREMD", "HAPLO", "TPL_(Spenderart_unbekannt)")){
+    Papaemmanuil_treatment$Transplant_type[i] = "Allo"
+  }
+  if(Papaemmanuil_treatment$Transplant_type[i] == "AUTO"){
+    Papaemmanuil_treatment$Transplant_type[i] = "Auto"
+  } 
+}
+
+Papaemmanuil_treatment$Transplant = ifelse(Papaemmanuil_treatment$Transplant_type == "None", "No", "Yes")
+
+Papaemmanuil_treatment$Survival = "Yes"
+Papaemmanuil_treatment$Consolidation = ifelse(Papaemmanuil_treatment$Transplant == "Yes", "Transplant", "Unknown")
+
+Papaemmanuil_treatment_simple = rename(count(Papaemmanuil_treatment, Induction, Transplant,Transplant_type, Consolidation, Survival), Freq = n)
+
+
+Papaemmanuil_treatment_final <- Papaemmanuil_treatment %>% left_join(Papaemmanuil_treatment_simple, by=c("Induction", "Transplant", "Transplant_type", "Consolidation", "Survival")) %>%
+  select(Induction, Consolidation, Transplant, Transplant_type, Survival, Freq) %>%
+  subset(Freq > 4) %>%
+  unique()
+
+# pal <- c("#ca0020", "#f4a582","#bababa", "#404040", "#2b83ba")
+pal <- c("#404040", "#2b83ba")
+
+Papaemmanuil_treatment_final %>%
+  mutate(
+    Cohort = "Papaemmanuil",
+    ss = paste(Transplant),
+    k = pal[ match(ss, sort(unique(ss))) ]
+  ) -> Papaemmanuil_treatment_final
+
+png(filename = "~/Desktop/MetaAML_results/Figure_1/Supplimental/Papaemmanuil_treatment.png", res = 300, width = 10, height = 7.5, units = "in")
+alluvial(Papaemmanuil_treatment_final[,1:5], freq=Papaemmanuil_treatment_final$Freq,
+         col = Papaemmanuil_treatment_final$k,
+         # border = TCGA_treatment_final$k,
+         # hide = TCGA_treatment_final$Freq < 10 ,
+         cex = 0.7
+)
+dev.off()
+
+
+# Beat AML
+Tyner_treatment = read_excel("~/Desktop/MetaAML_results/raw_data/41586_2018_623_MOESM3_ESM.xlsx", sheet = 5)
+Tyner_treatment = Tyner_treatment %>%
+  select(LabId, PatientId, cumulativeChemo, typeInductionTx, cumulativeTreatmentTypes, overallSurvival)
+
+# simlify the survival coding
+Tyner_treatment$Survival = "No"
+
+for(i in 1:nrow(Tyner_treatment)){
+  if(!is.na(Tyner_treatment$overallSurvival[i])){
+    if(Tyner_treatment$overallSurvival[i] > 1){
+      Tyner_treatment$Survival[i] = "Yes"
+    }   
+  }
+}
+
+
+# pull out the different types of induction therapy and simplify the type of transplant
+Tyner_treatment$typeInductionTx[is.na(Tyner_treatment$typeInductionTx)] <- "Unknown"
+Tyner_treatment$cumulativeTreatmentTypes[is.na(Tyner_treatment$cumulativeTreatmentTypes)] <- "Unknown"
+
+# find the cases where the induction type appears to be standard chemotherapy
+Tyner_treatment$Induction = "Other"
+for(i in 1:nrow(Tyner_treatment)){
+  if(Tyner_treatment$typeInductionTx[i] == "Unknown" & grep("Standard Chemotherapy", Tyner_treatment$cumulativeTreatmentTypes) & Tyner_treatment$cumulativeChemo[i] == "y"){
+    Tyner_treatment$Induction[i] = "7+3"
+  }  
+  if(Tyner_treatment$typeInductionTx[i] == "Standard Chemotherapy"){
+    Tyner_treatment$Induction[i] = "7+3"
+  }
+}
+
+# find cases with a transplant
+Tyner_treatment$Transplant = ifelse(grepl("Bone Marrow Transplant",Tyner_treatment$cumulativeTreatmentTypes), "Yes", "No")
+# find cases with targeted therapy
+Tyner_treatment$Targeted = ifelse(grepl("Targeted",Tyner_treatment$cumulativeTreatmentTypes), "Yes", "No")
+# find cases with other therapy
+Tyner_treatment$Other = ifelse(grepl("Other",Tyner_treatment$cumulativeTreatmentTypes), "Yes", "No")
+# find cases with palliative/supportive care
+Tyner_treatment$Palliative = ifelse(grepl("Supportive/Palliative Care",Tyner_treatment$cumulativeTreatmentTypes), "Yes", "No")
+
+Tyner_treatment$Consolidation = "None"
+for(i in 1:nrow(Tyner_treatment)){
+  if(Tyner_treatment$Targeted[i] == "Yes" & Tyner_treatment$Palliative[i] == "Yes" & Tyner_treatment$Other[i] == "Yes"){
+    Tyner_treatment$Consolidation[i] = "Targeted+other"
+  }
+  if(Tyner_treatment$Targeted[i] == "Yes" & Tyner_treatment$Palliative[i] == "Yes" & Tyner_treatment$Other[i] == "No"){
+    Tyner_treatment$Consolidation[i] = "Targeted+other"
+  }
+  if(Tyner_treatment$Targeted[i] == "Yes" & Tyner_treatment$Palliative[i] == "No" & Tyner_treatment$Other[i] == "Yes"){
+    Tyner_treatment$Consolidation[i] = "Targeted+other"
+  }
+  if(Tyner_treatment$Targeted[i] == "Yes" & Tyner_treatment$Palliative[i] == "No" & Tyner_treatment$Other[i] == "No"){
+    Tyner_treatment$Consolidation[i] = "Targeted"
+  }
+  if(Tyner_treatment$Targeted[i] == "No" & Tyner_treatment$Palliative[i] == "Yes" & Tyner_treatment$Other[i] == "No"){
+    Tyner_treatment$Consolidation[i] = "Palliative"
+  }
+  if(Tyner_treatment$Targeted[i] == "No" & Tyner_treatment$Palliative[i] == "No" & Tyner_treatment$Other[i] == "Yes" & Tyner_treatment$Transplant[i] != "Yes"){
+    Tyner_treatment$Consolidation[i] = "Other"
+  }
+  if(Tyner_treatment$Transplant[i] == "Yes"){
+    Tyner_treatment$Consolidation[i] = "Transplant"
+  }
+}
+
+
+Tyner_treatment$Transplant_type = ifelse(Tyner_treatment$Transplant == "Yes", "Unknown", "None")
+
+
+Tyner_treatment_simple = rename(count(Tyner_treatment, Induction, Consolidation, Transplant,Transplant_type, Survival), Freq = n)
+
+Tyner_treatment_final <- Tyner_treatment %>% left_join(Tyner_treatment_simple, by=c("Induction", "Transplant", "Consolidation", "Transplant_type", "Survival")) %>%
+  select(Induction, Consolidation, Transplant, Transplant_type, Survival, Freq) %>%
+  subset(Freq > 2) %>%
+  unique()
+
+# pal <- c("#ca0020", "#f4a582","#bababa", "#404040", "#2b83ba")
+pal <- c("#404040", "#2b83ba")
+
+Tyner_treatment_final %>%
+  mutate(
+    Cohort = "Tyner",
+    ss = paste(Transplant),
+    k = pal[ match(ss, sort(unique(ss))) ]
+  ) -> Tyner_treatment_final
+
+
+png(filename = "~/Desktop/MetaAML_results/Figure_1/Supplimental/BeatAML_treatment.png", res = 300, width = 10, height = 7.5, units = "in")
+alluvial(Tyner_treatment_final[,1:5], freq=Tyner_treatment_final$Freq,
+         col = Tyner_treatment_final$k,
+         # border = TCGA_treatment_final$k,
+         # hide = TCGA_treatment_final$Freq < 10 ,
+         cex = 0.7
+)
+dev.off()
+
+
+
+
+# TCGA
+TCGA_treatment = read.table("~/Desktop/MetaAML_results/raw_data/data_clinical_patient.txt", header = T, stringsAsFactors = F, sep = "\t")
+TCGA_treatment = TCGA_treatment %>%
+  select(PATIENT_ID, INDUCTION, TRANSPLANT_TYPE, OS_MONTHS)
+
+# simlify the survival coding
+TCGA_treatment$Survival = "No"
+
+for(i in 1:nrow(TCGA_treatment)){
+  if(!is.na(TCGA_treatment$OS_MONTHS[i])){
+    if(TCGA_treatment$OS_MONTHS[i] >= 0){
+      TCGA_treatment$Survival[i] = "Yes"
+    }   
+  }
+}
+
+# test case 
+for(i in 1:nrow(TCGA_treatment)){
+  if(TCGA_treatment$TRANSPLANT_TYPE[i] %in% c("Auto", "Auto, MUD", "Auto, sib Allo")){
+    TCGA_treatment$Transplant_type[i] = "Auto"
+  }
+  if(TCGA_treatment$TRANSPLANT_TYPE[i] %in% c("MUD", "MUD, Auto, MUD", "MUD, MUD", "MUD, MUD, MUD")){
+    TCGA_treatment$Transplant_type[i] = "Allo"
+  }
+  if(TCGA_treatment$TRANSPLANT_TYPE[i] %in% c("sib Allo", "sib Allo, sib Allo")){
+    TCGA_treatment$Transplant_type[i] = "Allo"
+  }
+  if(TCGA_treatment$TRANSPLANT_TYPE[i] == 0){
+    TCGA_treatment$Transplant_type[i] = "None"
+  }
+}
+
+for(i in 1:nrow(TCGA_treatment)){
+  if(TCGA_treatment$INDUCTION[i] %in% c("7+3+ATRA", "+3+3+PSC", "7+3, IT", "7+3+Genasense", "7+3, dauna", "7+3+dauno", "7+3+study drug", "7+3+3, gleevec", "7+3+AMD", "7+3+3, then 5+2+2", "7+3+3+PSC", "7+4+ATRA", "Decitabine then 7+3", "Revlmd then Decitbne,7+3,5+2")){
+    TCGA_treatment$Induction[i] = "7+3 +"
+  }
+  if(TCGA_treatment$INDUCTION[i] %in% c("Hydrea, ATRA started", "Hydrea & Idarubicin", "hydrea, didnt get addl chemo")){
+    TCGA_treatment$Induction[i] = "Other"
+  }
+  if(TCGA_treatment$INDUCTION[i] %in% c("Decitabine", "LBH/Decitabine", "Revlimid", "CLAM", "Cytarabine only", "Azacitidine", "low dose Ara C", "no treatment")){
+    TCGA_treatment$Induction[i] = "Other"
+  }
+  if(TCGA_treatment$INDUCTION[i] %in% c("7+3", "7+3+3")){
+    TCGA_treatment$Induction[i] = "7+3"
+  }
+}
+
+TCGA_treatment$Transplant = ifelse(TCGA_treatment$TRANSPLANT_TYPE == 0, "No", "Yes")
+TCGA_treatment$Consolidation = ifelse(TCGA_treatment$Transplant == "Yes", "Transplant", "Unknown")
+
+TCGA_treatment_simple = rename(count(TCGA_treatment, Induction, Consolidation, Transplant, Transplant_type, Survival), Freq = n)
+
+TCGA_treatment_final <- TCGA_treatment %>% left_join(TCGA_treatment_simple, by=c("Induction", "Consolidation", "Transplant", "Transplant_type", "Survival")) %>%
+  select(Induction, Consolidation, Transplant, Transplant_type, Survival, Freq) %>%
+  subset(Freq > 2) %>%
+  unique()
+
+# pal <- c("#ca0020", "#f4a582","#bababa", "#404040", "#2b83ba")
+pal <- c("#404040", "#2b83ba")
+
+TCGA_treatment_final %>%
+  mutate(
+    Cohort = "TCGA",
+    ss = paste(Transplant),
+    k = pal[ match(ss, sort(unique(ss))) ]
+  ) -> TCGA_treatment_final
+
+
+png(filename = "~/Desktop/MetaAML_results/Figure_1/Supplimental/TCGA_treatment.png", res = 300, width = 10, height = 7.5, units = "in")
+alluvial(TCGA_treatment_final[,1:5], freq=TCGA_treatment_final$Freq,
+         col = TCGA_treatment_final$k,
+         # ,
+         cex = 0.7
+)
+dev.off()
+
+
+
+
+
+# Stanford
+Majeti_treatment = read_excel("~/Desktop/Majeti_Lab/Data/Old_stuff/Combined_mutation_occurence/151102_Clinical Outcomes of All Patients without_PHI copy.xlsx", sheet = 3)
+Majeti_treatment = Majeti_treatment %>%
+  select(`Patient SU Number`, T1, Induction, Consolidation, Transplant, `Duration from diagnosis to D1`)
+
+Majeti_treatment$Induction[is.na(Majeti_treatment$Induction)] <- "Unknown"
+Majeti_treatment$Consolidation[is.na(Majeti_treatment$Consolidation)] <- "Unknown"
+
+Majeti_treatment$Survival = "Yes"
+Majeti_treatment$Transplant_type = "None"
+
+for(i in 1:nrow(Majeti_treatment)){
+  if(Majeti_treatment$Transplant[i] == 1){
+    Majeti_treatment$Transplant_type[i] = "Unknown"
+  }
+  if(Majeti_treatment$Induction[i] == "GCLAC"){
+    Majeti_treatment$Induction[i] = "Other"
+    Majeti_treatment$Consolidation[i] = "Other"
+  }
+  if(Majeti_treatment$Consolidation[i] == "GCLAC"){
+    Majeti_treatment$Consolidation[i] = "Other"
+  }
+  if(Majeti_treatment$Induction[i] %in% c("3+4", "AraC/Etoposide/Daunorubicin", "CPX-351")){
+    Majeti_treatment$Induction[i] = "Other"
+  }
+  if(Majeti_treatment$Consolidation[i] %in% c("2+3", "2+5", "5+2", "3+5", "MEC")){
+    Majeti_treatment$Consolidation[i] = "Other"
+  }
+}
+
+Majeti_treatment_simple = rename(count(Majeti_treatment, Induction, Consolidation, Transplant,Transplant_type, Survival), Freq = n)
+
+Majeti_treatment_final <- Majeti_treatment %>% left_join(Majeti_treatment_simple, by=c("Induction", "Consolidation", "Transplant", "Transplant_type", "Survival")) %>%
+  select(Induction, Consolidation, Transplant, Transplant_type, Survival, Freq) %>%
+  subset(Freq > 2) %>%
+  unique()
+
+# pal <- c("#ca0020", "#f4a582","#bababa", "#404040", "#2b83ba")
+pal <- c("#404040", "#2b83ba")
+
+Majeti_treatment_final %>%
+  mutate(
+    Cohort = "Majeti",
+    ss = paste(Transplant),
+    k = pal[ match(ss, sort(unique(ss))) ]
+  ) -> Majeti_treatment_final
+
+
+png(filename = "~/Desktop/MetaAML_results/Figure_1/Supplimental/Stanford_treatment.png", res = 300, width = 10, height = 7.5, units = "in")
+alluvial(Majeti_treatment_final[,1:4], freq=Majeti_treatment_final$Freq,
+         col = Majeti_treatment_final$k,
+         
+         cex = 0.7
+)
+dev.off()
+
+
+
+# Lindsley
+Lindsley_treatment = read_excel("~/Desktop/MetaAML_results/Data/Blood_2014_Lindsley_additional_clinical.xlsx")
+
+Lindsley_treatment$Induction = "Other"
+Lindsley_treatment$Consolidation = "Unknown"
+Lindsley_treatment$Transplant = "Unknown"
+Lindsley_treatment$Transplant_type = "Unknown"
+Lindsley_treatment$Survival = "Yes"
+
+Lindsley_treatment_simple = rename(count(Lindsley_treatment, Induction, Consolidation, Transplant, Transplant_type, Survival), Freq = n)
+
+Lindsley_treatment_final <- Lindsley_treatment %>% left_join(Lindsley_treatment_simple, by=c("Induction", "Consolidation", "Transplant", "Transplant_type", "Survival")) %>%
+  select(Induction, Consolidation, Transplant, Transplant_type, Survival, Freq) %>%
+  subset(Freq > 2) %>%
+  unique()
+
+# pal <- c("#ca0020", "#f4a582","#bababa", "#404040", "#2b83ba")
+pal <- c("#404040", "#2b83ba")
+
+Lindsley_treatment_final %>%
+  mutate(
+    Cohort = "Lindsley",
+    ss = paste(Transplant),
+    k = pal[ match(ss, sort(unique(ss))) ]
+  ) -> Lindsley_treatment_final
+
+
+png(filename = "~/Desktop/MetaAML_results/Figure_1/Supplimental/Lindsley_treatment.png", res = 300, width = 10, height = 7.5, units = "in")
+alluvial(Lindsley_treatment_final[,1:4], freq=Lindsley_treatment_final$Freq,
+         col = Lindsley_treatment_final$k,
+         
+         cex = 0.7
+)
+dev.off()
+
+
+
+# BMC_2016_Au 
+Au <- read_excel("~/Desktop/MetaAML_results/Data/BMC_2016_Au.xlsx") %>%
+  select("No.")
+
+names(Au) = c("Patient")
+Au$Induction = "Unknown"
+Au$Consolidation = "Unknown"
+Au$Transplant = "Unknown"
+Au$Transplant_type = "Unknown"
+Au$Survival = "No"
+
+Au_simple = rename(count(Au, Induction, Consolidation, Transplant, Transplant_type, Survival), Freq = n)
+
+Au_final <- Au %>% left_join(Au_simple, by=c("Induction", "Transplant", "Consolidation", "Transplant_type", "Survival")) %>%
+  select(Induction, Consolidation, Transplant, Transplant_type, Survival, Freq) %>%
+  subset(Freq > 2) %>%
+  unique()
+
+
+# pal <- c("#ca0020", "#f4a582","#bababa", "#404040", "#2b83ba")
+pal <- c("#404040", "#2b83ba")
+
+Au_final %>%
+  mutate(
+    Cohort = "Au",
+    ss = paste(Transplant),
+    k = pal[ match(ss, sort(unique(ss))) ]
+  ) -> Au_final
+
+
+png(filename = "~/Desktop/MetaAML_results/Figure_1/Supplimental/Au_treatment.png", res = 300, width = 10, height = 7.5, units = "in")
+alluvial(Au_final[,1:5], freq=Au_final$Freq,
+         col = Au_final$k,
+         
+         cex = 0.7
+)
+dev.off()
+
+
+# Oncotarget_2016_Wang 
+wang <- read_excel("~/Desktop/MetaAML_results/Data/Oncotarget_2016_Wang.xlsx")
+wang <- wang[-1,]
+wang <- wang %>%
+  select(`Sample ID`) %>%
+  unique()
+
+wang$Induction = "Unknown"
+wang$Consolidation = "Unknown"
+wang$Transplant = "Unknown"
+wang$Transplant_type = "Unknown"
+wang$Survival = "No"
+
+wang_simple = rename(count(wang, Induction, Consolidation, Transplant, Transplant_type, Survival), Freq = n)
+
+wang_final <- wang %>% left_join(wang_simple, by=c("Induction", "Transplant", "Consolidation", "Transplant_type", "Survival")) %>%
+  select(Induction, Consolidation, Transplant, Transplant_type, Survival, Freq) %>%
+  subset(Freq > 2) %>%
+  unique()
+
+
+# pal <- c("#ca0020", "#f4a582","#bababa", "#404040", "#2b83ba")
+pal <- c("#404040", "#2b83ba")
+
+wang_final %>%
+  mutate(
+    Cohort = "Wang",
+    ss = paste(Transplant),
+    k = pal[ match(ss, sort(unique(ss))) ]
+  ) -> wang_final
+
+
+png(filename = "~/Desktop/MetaAML_results/Figure_1/Supplimental/Au_treatment.png", res = 300, width = 10, height = 7.5, units = "in")
+alluvial(wang_final[,1:5], freq=wang_final$Freq,
+         col = wang_final$k,
+         
+         cex = 0.7
+)
+dev.off()
+
+
+# Hirsch
+hirsch_clinical = read_excel("~/Desktop/MetaAML_results/Data/Hirsch_2016_Nat_Comm_clinical_data.xlsx", sheet = 1)
+
+hirsch_clinical = hirsch_clinical %>%
+  select(UPN, `intensive chemotherapy`, `Allogeneic BMT in first CR`, `time from diagnosis (days)`) %>%
+  unique() 
+
+hirsch_clinical$Induction = ifelse(hirsch_clinical$`intensive chemotherapy` == "yes", "7+3", "Other")
+hirsch_clinical$Transplant = ifelse(grepl("yes", hirsch_clinical$`Allogeneic BMT in first CR`) == T, "Yes", "No")
+hirsch_clinical$Transplant_type = ifelse(grepl("Yes", hirsch_clinical$Transplant) == T, "Allo", "None")
+hirsch_clinical$Survival = ifelse(hirsch_clinical$`time from diagnosis (days)` > 0, "Yes", "No")
+
+hirsch_clinical$Consolidation = ifelse(hirsch_clinical$Transplant == "Yes", "Transplant", "Unknown")
+
+
+hirsch_clinical_simple = rename(count(hirsch_clinical, Induction, Consolidation, Transplant, Transplant_type, Survival), Freq = n)
+
+hirsch_clinical_final <- hirsch_clinical %>% left_join(hirsch_clinical_simple, by=c("Induction", "Transplant", "Consolidation", "Transplant_type", "Survival")) %>%
+  select(Induction, Consolidation, Transplant, Transplant_type, Survival, Freq) %>%
+  subset(Freq > 2) %>%
+  unique()
+
+
+# pal <- c("#ca0020", "#f4a582","#bababa", "#404040", "#2b83ba")
+pal <- c("#404040", "#2b83ba")
+
+hirsch_clinical_final %>%
+  mutate(
+    Cohort = "Hirsch",
+    ss = paste(Transplant),
+    k = pal[ match(ss, sort(unique(ss))) ]
+  ) -> hirsch_clinical_final
+
+
+png(filename = "~/Desktop/MetaAML_results/Figure_1/Supplimental/Hirsch_treatment.png", res = 300, width = 10, height = 7.5, units = "in")
+alluvial(hirsch_clinical_final[,1:5], freq=hirsch_clinical_final$Freq,
+         col = hirsch_clinical_final$k,
+         
+         cex = 0.7
+)
+dev.off()
+
+
+
+
+# Welch
+welch_treatment = read_excel("~/Desktop/MetaAML_results/Data/NEJM_2016_Welch_clinical.xlsx")
+welch_treatment = welch_treatment[-117,]
+welch_treatment = welch_treatment %>%
+  select(UPN, `Prior therapy`, `Transplant (Yes=1, No=0)`, `Survival (days)`)
+
+names(welch_treatment) = c("UPN", "Induction", "Transplant", "Survival")
+
+welch_treatment$Induction[is.na(welch_treatment$Induction)] <- "Unknown"
+welch_treatment$Transplant = ifelse(welch_treatment$Transplant == 1, "Yes", "No")
+
+for(i in 1:nrow(welch_treatment)){
+  if(welch_treatment$Transplant[i] == "No"){
+    welch_treatment$Transplant_type[i] = "None"
+  }
+  if(welch_treatment$Transplant[i] == "Yes"){
+    welch_treatment$Transplant_type[i] = "Unknown"
+  }
+}
+welch_treatment$Survival = "Yes"
+welch_treatment$Consolidation = ifelse(welch_treatment$Transplant == "Yes", "Transplant", "Unknown")
+
+'%ni%' <- Negate('%in%')
+
+for(i in 1:nrow(welch_treatment)){
+  if(welch_treatment$Induction[i] %in% c("7+3, HiDAC, desatinib maintenance", "7+3, HiDAC, oral Clofarabine x 5 cycles", "7+3. MitoEC", "7+3. HiDAC. CLAG", "7+3. HiDAC. FLAG. NK cell infusion", "7+3. HIDAC. NK cell infusion. Decitabine 5 days x 1 cycle")){
+    welch_treatment$Induction[i] = "7+3"
+  }
+  if(welch_treatment$Induction[i] %ni% c("7+3, HiDAC, desatinib maintenance", "7+3, HiDAC, oral Clofarabine x 5 cycles", "7+3. MitoEC", "7+3. HiDAC. CLAG", "7+3. HiDAC. FLAG. NK cell infusion", "7+3. HIDAC. NK cell infusion. Decitabine 5 days x 1 cycle", "Unknown", "7+3")){
+    welch_treatment$Induction[i] = "Other"
+  }
+}
+
+welch_treatment_simple = rename(count(welch_treatment, Induction, Consolidation, Transplant, Transplant_type, Survival), Freq = n)
+
+welch_treatment_final <- welch_treatment %>% left_join(welch_treatment_simple, by=c("Induction", "Consolidation", "Transplant", "Transplant_type", "Survival")) %>%
+  select(Induction, Consolidation, Transplant, Transplant_type, Survival, Freq) %>%
+  subset(Freq > 2) %>%
+  unique()
+
+# pal <- c("#ca0020", "#f4a582","#bababa", "#404040", "#2b83ba")
+pal <- c("#404040", "#2b83ba")
+
+welch_treatment_final %>%
+  mutate(
+    Cohort = "Welch",
+    ss = paste(Transplant),
+    k = pal[ match(ss, sort(unique(ss))) ]
+  ) -> welch_treatment_final
+
+
+png(filename = "~/Desktop/MetaAML_results/Figure_1/Supplimental/Welch_treatment.png", res = 300, width = 10, height = 7.5, units = "in")
+alluvial(welch_treatment_final[,1:4], freq=welch_treatment_final$Freq,
+         col = welch_treatment_final$k,
+         
+         cex = 0.7
+)
+dev.off()
+
+
+# Garg
+garg_treatment_1 = read_excel("~/Desktop/MetaAML_results/Data/Garg_2015_blood_clinical_discovery_cohort.xlsx") %>%
+  select(`Sample ID`, `Induction Chemotherapy`, `OS\r\n(Mon)`)
+
+garg_treatment_2 = read_excel("~/Desktop/MetaAML_results/Data/Garg_2015_blood_clinical_targeted_cohort.xlsx") %>%
+  select(`Sample ID`, `Induction Chemotherapy`, `OS\r\n(Mon)`)
+
+
+garg_treatment = rbind(garg_treatment_1, garg_treatment_2)
+garg_treatment$Transplant = "Unknown"
+names(garg_treatment) = c("Patient", "Induction", "OS", "Transplant")
+
+garg_treatment$Consolidation = "Unknown"
+garg_treatment$Transplant_type = "Unknown"
+
+garg_treatment$Survival = ifelse(garg_treatment$OS == "NA", "No", "Yes")
+
+garg_treatment$Induction = "7+3"
+
+garg_treatment_simple = rename(count(garg_treatment, Induction, Consolidation, Transplant, Transplant_type, Survival), Freq = n)
+
+garg_treatment_final <- garg_treatment %>% left_join(garg_treatment_simple, by=c("Induction", "Consolidation", "Transplant", "Transplant_type", "Survival")) %>%
+  select(Induction, Consolidation, Transplant, Transplant_type, Survival, Freq) %>%
+  subset(Freq > 2) %>%
+  unique()
+
+
+# pal <- c("#ca0020", "#f4a582","#bababa", "#404040", "#2b83ba")
+pal <- c("#404040", "#2b83ba")
+
+garg_treatment_final %>%
+  mutate(
+    Cohort = "Garg",
+    ss = paste(Transplant),
+    k = pal[ match(ss, sort(unique(ss))) ]
+  ) -> garg_treatment_final
+
+
+png(filename = "~/Desktop/MetaAML_results/Figure_1/Supplimental/Garg_treatment.png", res = 300, width = 10, height = 7.5, units = "in")
+alluvial(garg_treatment_final[,1:5], freq=garg_treatment_final$Freq,
+         col = garg_treatment_final$k,
+         
+         cex = 0.7
+)
+dev.off()
+
+
+
+# Huet
+huet_treatment = read_excel("~/Desktop/MetaAML_results/Data/Huet_2018_Blood.xlsx")
+colnames(huet_treatment) = huet_treatment[1,]
+huet_treatment = huet_treatment[-1,]
+huet_treatment = huet_treatment %>%
+  select(`Patient ID`, `Induction regimen`, `Time to final outcome (months)`)
+
+names(huet_treatment) = c("Patient", "Induction", "OS")
+huet_treatment$Consolidation = "Unknown"
+huet_treatment$Transplant = "Unknown"
+huet_treatment$Transplant_type = "Unknown"
+
+for(i in 1:nrow(huet_treatment)){
+  if(huet_treatment$Induction[i] == "3+7"){
+    huet_treatment$Induction[i] = "7+3"
+  }
+  if(huet_treatment$Induction[i] == "3+7+ATRA"){
+    huet_treatment$Induction[i] = "7+3 +"
+  }
+  if(huet_treatment$Induction[i] == "sequential"){
+    huet_treatment$Induction[i] = "Other"
+  }
+}
+
+huet_treatment$Survival = ifelse(huet_treatment$OS > 0, "Yes", "No")
+
+huet_treatment_simple = rename(count(huet_treatment, Induction, Consolidation, Transplant, Transplant_type, Survival), Freq = n)
+
+huet_treatment_final <- huet_treatment %>% left_join(huet_treatment_simple, by=c("Induction", "Transplant", "Consolidation", "Transplant_type", "Survival")) %>%
+  select(Induction, Consolidation, Transplant, Transplant_type, Survival, Freq) %>%
+  subset(Freq > 2) %>%
+  unique()
+
+
+# pal <- c("#ca0020", "#f4a582","#bababa", "#404040", "#2b83ba")
+pal <- c("#404040", "#2b83ba")
+
+huet_treatment_final %>%
+  mutate(
+    Cohort = "Huet",
+    ss = paste(Transplant),
+    k = pal[ match(ss, sort(unique(ss))) ]
+  ) -> huet_treatment_final
+
+
+png(filename = "~/Desktop/MetaAML_results/Figure_1/Supplimental/Huet_treatment.png", res = 300, width = 10, height = 7.5, units = "in")
+alluvial(huet_treatment_final[,1:5], freq=huet_treatment_final$Freq,
+         col = huet_treatment_final$k,
+         
+         cex = 0.7
+)
+dev.off()
+
+
+
+
+
+# Hirsch
+hirsch_treatment = read_excel("~/Desktop/MetaAML_results/Data/Hirsch_2016_Nat_Comm_clinical_data.xlsx", sheet = 1) %>%
+  select(UPN, `intensive chemotherapy`, `Allogeneic BMT in first CR`, `time from diagnosis (days)`)
+names(hirsch_treatment) = c("Patient", "Induction_simple", "TPL", "OS")
+
+hirsch_treatment$Induction = ifelse(hirsch_treatment$Induction_simple == "yes", "Intensive chemo", "None")
+hirsch_treatment$Transplant = ifelse(grepl("yes", hirsch_treatment$TPL) == T, "Yes", "No")
+hirsch_treatment$Transplant_type = ifelse(hirsch_treatment$Transplant == "Yes", "Allo", "None")
+
+hirsch_treatment$Consolidation = ifelse(hirsch_treatment$Transplant == "Yes", "Transplent", "Unknown")
+
+hirsch_treatment$Survival = ifelse(hirsch_treatment$OS > 0, "Yes", "No")
+
+hirsch_treatment_simple = rename(count(hirsch_treatment, Induction, Consolidation, Transplant, Transplant_type, Survival), Freq = n)
+
+hirsch_treatment_final <- hirsch_treatment %>% left_join(hirsch_treatment_simple, by=c("Induction", "Consolidation", "Transplant", "Transplant_type", "Survival")) %>%
+  select(Induction, Consolidation, Transplant, Transplant_type, Survival, Freq) %>%
+  subset(Freq > 2) %>%
+  unique()
+
+# pal <- c("#ca0020", "#f4a582","#bababa", "#404040", "#2b83ba")
+pal <- c("#404040", "#2b83ba")
+
+hirsch_treatment_final %>%
+  mutate(
+    Cohort = "Hirsch",
+    ss = paste(Transplant),
+    k = pal[ match(ss, sort(unique(ss))) ]
+  ) -> hirsch_treatment_final
+
+
+png(filename = "~/Desktop/MetaAML_results/Figure_1/Supplimental/Hirsch_treatment.png", res = 300, width = 10, height = 7.5, units = "in")
+alluvial(hirsch_treatment_final[,1:5], freq=hirsch_treatment_final$Freq,
+         col = hirsch_treatment_final$k,
+         
+         cex = 0.7
+)
+dev.off()
+
+
+# Azizi
+"%ni%" <- Negate("%in%") 
+
+multiple_treatment = read_excel("~/Desktop/MetaAML_results/Data/azizi_diagnosis_relapse_aml_clinical.xlsx") %>%
+  select(Case, Cohort, Induction, Consolidation, Overall_Survival, Cohort) %>%
+  subset(Cohort == "Grief")
+
+multiple_treatment$Induction[is.na(multiple_treatment$Induction)] <- "Other"
+multiple_treatment$Consolidation[is.na(multiple_treatment$Consolidation)] <- "Unknown"
+
+multiple_treatment$Transplant = "No"
+multiple_treatment$Transplant_type = "None"
+
+for(i in 1:nrow(multiple_treatment)){
+  if(grepl("Allo", multiple_treatment$Consolidation[i]) == T){
+    multiple_treatment$Transplant[i] = "Yes"
+    multiple_treatment$Transplant_type[i] = "Allo"
+  }
+  if(grepl("Auto", multiple_treatment$Consolidation[i]) == T){
+    multiple_treatment$Transplant[i] = "Yes"
+    multiple_treatment$Transplant_type[i] = "Auto"
+  }
+  if(multiple_treatment$Induction[i] %in% c("3+7","Cytarabine+Daunorubicin", "Daunarubicin+Cytarabine", "Daunarubicin+Cytarabine; Daunarubicin+Cytarabine")){
+    multiple_treatment$Induction[i] = "7+3"
+  }
+  if(multiple_treatment$Induction[i] %in% c("3+7 + cyclosporine", "3+7, 2+5", "3+7 + gemtuzumab ozogamicin", "Cytarabine+Daunorubicin; Mitoxantrone+Cytarabine+Vincristine", "Cytarabine+Daunorubicin+Etoposide", "Cytarabine+Daunorubicin+Mitoxantrone", "Daunarubicin+Cytarabine (+/-bevacizumab); Cytarabine (+/-bevacizumab)", "Daunorubicin+Cytarabine+Etoposide; Daunorubicin+Cytarabine+ Etoposide")){
+    multiple_treatment$Induction[i] = "7+3 +"
+  }
+  if(multiple_treatment$Induction[i] %in% c("Thioguanine+Cytarabine+Daunorubicin+Mitoxantrone", "Thioguanine+Cytarabine+Daunorubicin", "Mitozantrone+Cytarabine", "Idarubicin+Cytarabine", "Idarubicin+Cytarabine+Etoposide")){
+    multiple_treatment$Induction[i] = "Other"
+  }
+  if(multiple_treatment$Consolidation[i] %in% c("Idarubicin+Cytarabine+Etoposide", "Amsacrine+Cytarabine; AutoSCT", "Amsacrine+Cytarabine; AlloSCT", "Amsacrine+Cytarabine", "Cytarabine")){
+    multiple_treatment$Consolidation[i] = "Other"
+  }
+}
+
+
+multiple_treatment$Overall_Survival[is.na(multiple_treatment$Overall_Survival)] <- "0"
+multiple_treatment$Survival = ifelse(multiple_treatment$Overall_Survival > 0, "Yes", "No")
+
+multiple_treatment_simple = rename(count(multiple_treatment, Induction, Consolidation, Transplant, Transplant_type, Survival, Cohort), Freq = n)
+
+multiple_treatment_final <- multiple_treatment %>% left_join(multiple_treatment_simple, by=c("Induction", "Consolidation", "Transplant", "Transplant_type", "Survival", "Cohort")) %>%
+  select(Induction, Consolidation, Transplant, Transplant_type, Survival, Cohort, Freq) %>%
+  subset(Freq > 2) %>%
+  unique()
+
+
+# pal <- c("#ca0020", "#f4a582","#bababa", "#404040", "#2b83ba", "darkred")
+pal <- c("#404040", "#2b83ba")
+
+multiple_treatment_final %>%
+  mutate(
+    ss = paste(Transplant),
+    k = pal[ match(ss, sort(unique(ss))) ]
+  ) -> multiple_treatment_final
+
+
+png(filename = "~/Desktop/MetaAML_results/Figure_1/Supplimental/Azizi_treatment.png", res = 300, width = 10, height = 7.5, units = "in")
+alluvial(multiple_treatment_final[,c(6,1:5)], freq=multiple_treatment_final$Freq,
+         col = multiple_treatment_final$k,
+         
+         cex = 0.7
+)
+dev.off()
+
+
+
+# all cohorts together
+all_cohorts = dplyr::bind_rows(Papaemmanuil_treatment_final, Tyner_treatment_final, TCGA_treatment_final, Majeti_treatment_final,garg_treatment_final,huet_treatment_final,multiple_treatment_final,welch_treatment_final, Lindsley_treatment_final, Au_final, hirsch_clinical_final, wang_final)
+
+for(i in 1:nrow(all_cohorts)){
+  if(all_cohorts$Transplant_type[i] == "No"){
+    all_cohorts$Transplant_type[i] = "None"
+  }  
+}
+
+# "Welch" = '#00A087FF',
+# "Wang" = '#E64B35FF',
+# "Tyner" = "#0073C2FF", 
+# "TCGA" = '#EFC000FF', 
+# "Papaemmanuil" = "#CD534CFF", 
+# "Majeti" = '#868686FF', 
+# "Lindsley" = '#7AA6DCFF', 
+# "Huet" = "#B09C85FF"
+# "Greif" = "#F39B7FFF",
+# "Garg" = '#3C5488FF',
+# "Hirsch" = "#7E6148FF", 
+# "Au" = '#4DBBD5FF',
+
+
+pal <- c("#4DBBD5FF", "#7E6148FF", "#3C5488FF", "#F39B7FFF", "#B09C85FF",  "#7AA6DCFF", "#868686FF", "#CD534CFF", "#EFC000FF", "#0073C2FF", "#E64B35FF", "#00A087FF")
+
+all_cohorts %>%
+  mutate(
+    ss = paste(Cohort),
+    k = pal[ match(ss, sort(unique(ss))) ]
+  ) -> all_cohorts_final
+
+png(filename = "~/Desktop/MetaAML_results/Figure_1/Supplimental/Combined_treatment_all.png", res = 300, width = 30, height = 12, units = "in")
+alluvial(all_cohorts_final[,c(7,1:5)], freq=all_cohorts_final$Freq,
+         col = all_cohorts_final$k,
+         # border = "darkgrey",
+         cex = 1
+)
+dev.off()
+
+
+# stacked barplot
+Papaemmanuil_treatment_bar = Papaemmanuil_treatment %>%
+  select(1, Transplant_type, Survival, Induction, Transplant, Consolidation) %>%
+  magrittr::set_names(c("Sample", "Transplant_type", "Survival", "Induction", "Transplant", "Consolidation"))  %>%
+  mutate(Cohort = "Papaemmanuil")
+Tyner_treatment_bar = Tyner_treatment %>%
+  select(1, Transplant_type, Survival, Induction, Transplant, Consolidation) %>%
+  magrittr::set_names(c("Sample", "Transplant_type", "Survival", "Induction", "Transplant", "Consolidation"))  %>%
+  mutate(Cohort = "Tyner")
+TCGA_treatment_bar = TCGA_treatment %>%
+  select(1, Transplant_type, Survival, Induction, Transplant, Consolidation) %>%
+  magrittr::set_names(c("Sample", "Transplant_type", "Survival", "Induction", "Transplant", "Consolidation"))  %>%
+  mutate(Cohort = "TCGA")
+Majeti_treatment_bar = Majeti_treatment %>%
+  select(1, Transplant_type, Survival, Induction, Transplant, Consolidation) %>%
+  magrittr::set_names(c("Sample", "Transplant_type", "Survival", "Induction", "Transplant", "Consolidation")) %>%
+  mutate(Cohort = "Majeti") 
+garg_treatment_bar = garg_treatment %>%
+  select(1, Transplant_type, Survival, Induction, Transplant, Consolidation) %>%
+  magrittr::set_names(c("Sample", "Transplant_type", "Survival", "Induction", "Transplant", "Consolidation")) %>%
+  mutate(Cohort = "Garg")
+huet_treatment_bar = huet_treatment %>%
+  select(1, Transplant_type, Survival, Induction, Transplant, Consolidation) %>%
+  magrittr::set_names(c("Sample", "Transplant_type", "Survival", "Induction", "Transplant", "Consolidation")) %>%
+  mutate(Cohort = "Huet")
+multiple_treatment_bar = multiple_treatment %>%
+  select(1, Transplant_type, Survival, Induction, Transplant, Consolidation) %>%
+  magrittr::set_names(c("Sample", "Transplant_type", "Survival", "Induction", "Transplant", "Consolidation")) %>%
+  mutate(Cohort = "Greif")
+welch_treatment_bar = welch_treatment %>%
+  select(1, Transplant_type, Survival, Induction, Transplant, Consolidation) %>%
+  magrittr::set_names(c("Sample", "Transplant_type", "Survival", "Induction", "Transplant", "Consolidation")) %>%
+  mutate(Cohort = "Welch")
+Lindsley_treatment_bar = Lindsley_treatment %>%
+  select(1, Transplant_type, Survival, Induction, Transplant, Consolidation) %>%
+  magrittr::set_names(c("Sample", "Transplant_type", "Survival", "Induction", "Transplant", "Consolidation")) %>%
+  mutate(Cohort = "Lindsley")
+Au_bar = Au %>%
+  select(1, Transplant_type, Survival, Induction, Transplant, Consolidation) %>%
+  magrittr::set_names(c("Sample", "Transplant_type", "Survival", "Induction", "Transplant", "Consolidation")) %>%
+  mutate(Cohort = "Au")
+hirsch_treatment_bar =  hirsch_clinical %>%
+  select(1, Transplant_type, Survival, Induction, Transplant, Consolidation) %>%
+  magrittr::set_names(c("Sample", "Transplant_type", "Survival", "Induction", "Transplant", "Consolidation")) %>%
+  mutate(Cohort = "Hirsch")
+wang_bar =  wang %>%
+  select(1, Transplant_type, Survival, Induction, Transplant, Consolidation) %>%
+  magrittr::set_names(c("Sample", "Transplant_type", "Survival", "Induction", "Transplant", "Consolidation")) %>%
+  mutate(Cohort = "Wang")
+
+# all cohorts together
+all_cohorts_bar = rbind(Papaemmanuil_treatment_bar, Tyner_treatment_bar, TCGA_treatment_bar, Majeti_treatment_bar,garg_treatment_bar,huet_treatment_bar,multiple_treatment_bar,welch_treatment_bar, Lindsley_treatment_bar, Au_bar, hirsch_treatment_bar, wang_bar)
+
+all_cohorts_bar = all_cohorts_bar %>%
+  subset(Cohort %in% c("Tyner" , 
+                       "TCGA" , 
+                       "Majeti", 
+                       "Papaemmanuil", 
+                       "Lindsley", 
+                       "Wang" ,
+                       "Au" ,
+                       "Welch",
+                       "Garg" ,
+                       "Greif" ,
+                       "Hirsch" , 
+                       "Huet" )) 
+
+for(i in 1:nrow(all_cohorts_bar)){
+  if(all_cohorts_bar$Induction[i] %in% c("3+5", "Cytarabine+Mitoxantrone")){
+    all_cohorts_bar$Induction[i] = "Other"
+  }
+}
+
+# induction
+
+a = ggplot(data=all_cohorts_bar, aes(x=forcats::fct_infreq(Induction), fill = Cohort)) +
+  geom_bar(stat = "count") +
+  scale_fill_manual(values=c("Tyner" = "#0073C2FF", 
+                             "TCGA" = '#EFC000FF', 
+                             "Majeti" = '#868686FF', 
+                             "Papaemmanuil" = "#CD534CFF", 
+                             "Lindsley" = '#7AA6DCFF', 
+                             "Wang" = '#E64B35FF',
+                             "Au" = '#4DBBD5FF',
+                             "Welch" = '#00A087FF',
+                             "Garg" = '#3C5488FF',
+                             "Greif" = "#F39B7FFF",
+                             "Hirsch" = "#7E6148FF", 
+                             "Huet" = "#B09C85FF")) +
+  theme_cowplot() +
+  ylab("# of patients")+
+  xlab(NULL) +
+  ggtitle("Induction") +
+  theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust = 1)) +
+  theme(
+    strip.background = element_rect(colour="black", fill="white", 
+                                    size=1.5, linetype="solid"),
+    plot.title = element_text(hjust = 0.5))
+
+ggsave(filename = "~/Desktop/MetaAML_results/Figure_1/Supplimental/induction_distribution.pdf", dpi = 300, width = 7.5, height = 5, units = "in")
+
+
+b = ggplot(data=all_cohorts_bar, aes(x=forcats::fct_infreq(Consolidation), fill = Cohort)) +
+  geom_bar(stat = "count") +
+  scale_fill_manual(values=c("Tyner" = "#0073C2FF", 
+                             "TCGA" = '#EFC000FF', 
+                             "Majeti" = '#868686FF', 
+                             "Papaemmanuil" = "#CD534CFF", 
+                             "Lindsley" = '#7AA6DCFF', 
+                             "Wang" = '#E64B35FF',
+                             "Au" = '#4DBBD5FF',
+                             "Welch" = '#00A087FF',
+                             "Garg" = '#3C5488FF',
+                             "Greif" = "#F39B7FFF",
+                             "Hirsch" = "#7E6148FF", 
+                             "Huet" = "#B09C85FF")) +
+  theme_cowplot() +
+  ylab("# of patients")+
+  xlab(NULL) +
+  ggtitle("Consolidation") +
+  theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust = 1)) +
+  theme(
+    strip.background = element_rect(colour="black", fill="white", 
+                                    size=1.5, linetype="solid"),
+    plot.title = element_text(hjust = 0.5))
+
+ggsave(filename = "~/Desktop/MetaAML_results/Figure_1/Supplimental/consolidation_distribution.pdf", dpi = 300, width = 7.5, height = 5, units = "in")
+
+
+c = ggplot(data=all_cohorts_bar, aes(x=forcats::fct_infreq(Transplant), fill = Cohort)) +
+  geom_bar(stat = "count") +
+  scale_fill_manual(values=c("Tyner" = "#0073C2FF", 
+                             "TCGA" = '#EFC000FF', 
+                             "Majeti" = '#868686FF', 
+                             "Papaemmanuil" = "#CD534CFF", 
+                             "Lindsley" = '#7AA6DCFF', 
+                             "Wang" = '#E64B35FF',
+                             "Au" = '#4DBBD5FF',
+                             "Welch" = '#00A087FF',
+                             "Garg" = '#3C5488FF',
+                             "Greif" = "#F39B7FFF",
+                             "Hirsch" = "#7E6148FF", 
+                             "Huet" = "#B09C85FF")) +
+  theme_cowplot() +
+  ylab("# of patients")+
+  xlab(NULL) +
+  ggtitle("Transplant") +
+  theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust = 1)) +
+  theme(
+    strip.background = element_rect(colour="black", fill="white", 
+                                    size=1.5, linetype="solid"),
+    plot.title = element_text(hjust = 0.5))
+
+ggsave(filename = "~/DesktopMetaAML_results/Figure_1/Supplimental/transplant_distribution.pdf", dpi = 300, width = 7.5, height = 5, units = "in")
+
+d = ggplot(data=all_cohorts_bar, aes(x=forcats::fct_infreq(Transplant_type), fill = Cohort)) +
+  geom_bar(stat = "count") +
+  scale_fill_manual(values=c("Tyner" = "#0073C2FF", 
+                             "TCGA" = '#EFC000FF', 
+                             "Majeti" = '#868686FF', 
+                             "Papaemmanuil" = "#CD534CFF", 
+                             "Lindsley" = '#7AA6DCFF', 
+                             "Wang" = '#E64B35FF',
+                             "Au" = '#4DBBD5FF',
+                             "Welch" = '#00A087FF',
+                             "Garg" = '#3C5488FF',
+                             "Greif" = "#F39B7FFF",
+                             "Hirsch" = "#7E6148FF", 
+                             "Huet" = "#B09C85FF")) +
+  theme_cowplot() +
+  ylab("# of patients")+
+  xlab(NULL) +
+  ggtitle("Transplant Type") +
+  theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust = 1)) +
+  theme(
+    strip.background = element_rect(colour="black", fill="white", 
+                                    size=1.5, linetype="solid"),
+    plot.title = element_text(hjust = 0.5))
+
+ggsave(filename = "~/Desktop/MetaAML_results/Figure_1/Supplimental/transplant_type_distribution.pdf", dpi = 300, width = 7.5, height = 5, units = "in")
+
+ggarrange(a, b, c, d, 
+          ncol = 4,
+          legend = "right",
+          align = "hv",
+          # align = "v",
+          common.legend = TRUE)
+
+ggsave(filename = "~/Desktop/MetaAML_results/Figure_1/Supplimental/treatment_distributions.pdf", dpi = 300, width = 20, height = 5, units = "in")
+
+
+
 if (!require('ggridges')) install.packages('ggridges'); library('ggridges')
 
 dir.create("~/Desktop/MetaAML_results/Figure_1/Supplimental")
@@ -1890,6 +2856,109 @@ png(filename = "~/Desktop/MetaAML_results/Figure_1/Supplimental/de_novo_survival
 surv_plot
 print(surv_plot)
 dev.off()
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+# forrest plot ####
+# individual mutation's HRs
+
+temp_final_hr_2$gene <- factor(temp_final_hr_2$gene, levels = temp_final_hr_2$gene[order(temp_final_hr_2$HR)])
+temp_final_hr_2$log_rank_p = round(temp_final_hr_2$log_rank_p, 3)
+temp_final_hr_2$p_text = NA
+
+for(i in 1:nrow(temp_final_hr_2)){
+  if(temp_final_hr_2$log_rank_p[i] <= 0.05 & temp_final_hr_2$log_rank_p[i] >= 0.001){
+    temp_final_hr_2$p_text[i] = paste("p = ", temp_final_hr_2$log_rank_p[i], sep = "")
+  } 
+  if(temp_final_hr_2$log_rank_p[i] == 0){
+    temp_final_hr_2$p_text[i] = paste("p < 0.001")
+  } 
+  if(temp_final_hr_2$log_rank_p[i] > 0.05){
+    temp_final_hr_2$p_text[i] = ""
+  }
+}
+
+# add functional category to the mutations for visualization purposes
+temp_final_hr_2$mutation_category <- NA
+
+DNA_methylation <- list("DNMT3A","IDH2","TET2","IDH1")
+Chromatin_cohesin <- list("ASXL1", "RAD21", "STAG2", "EZH2", "BCOR")
+RTK_RAS_Signaling <- list("PTPN11", "CBL", "NF1", "KRAS", "KIT", "NRAS", "FLT3-ITD", "FLT3-TKD", "JAK2")
+Splicing <- list("SF3B1", "SRSF2", "U2AF1")
+Transcription <- list("CEBPA", "GATA2", "RUNX1", "MYC", "ETV6", "ZBTB33", "MLL")
+Tumor_suppressors <- list("TP53", "PHF6", "WT1")
+
+for(i in 1:nrow(temp_final_hr_2)){
+  if(temp_final_hr_2$gene[i] %in% DNA_methylation){
+    temp_final_hr_2$mutation_category[i] <- "DNA Methylation"
+  }
+  if(temp_final_hr_2$gene[i] %in% Chromatin_cohesin){
+    temp_final_hr_2$mutation_category[i] <- "Chromatin/Cohesin"
+  }
+  if(temp_final_hr_2$gene[i] %in% RTK_RAS_Signaling){
+    temp_final_hr_2$mutation_category[i] <- "RTK/RAS Signaling"
+  }
+  if(temp_final_hr_2$gene[i] %in% Splicing){
+    temp_final_hr_2$mutation_category[i] <- "Splicing"
+  }
+  if(temp_final_hr_2$gene[i] %in% Transcription){
+    temp_final_hr_2$mutation_category[i] <- "Transcription"
+  }
+  if(temp_final_hr_2$gene[i] == "NPM1"){
+    temp_final_hr_2$mutation_category[i] <- "NPM1"
+  }
+  if(temp_final_hr_2$gene[i] %in% Tumor_suppressors){
+    temp_final_hr_2$mutation_category[i] <- "Tumor suppressors"
+  }
+}
+
+# extract the p-value and hazard ratio for the individual interactions
+p = round(as.numeric(summary(model)$sctest[3]), 3)
+
+p = ifelse(p < 0.001, paste0("p < 0.001"), paste("p =", p))
+
+hr = paste("HR = ", round(as.numeric(forest$HR), 2), " (", round(as.numeric(forest$lower_95), 2), "-", round(as.numeric(forest$upper_95), 2), ")", sep = "")
+
+p_hr = paste(p, "; ", hr, sep = "")
+
+
+# color coded by mutation category plot
+ggplot(temp_final_hr_2, aes(x = reorder(gene, -HR), y = HR, label = temp_final_hr_2$p_text)) +
+  geom_hline(yintercept=.5, linetype="dashed", color = "#d9d9d9") +
+  geom_hline(yintercept=1, linetype="dashed", color = "black") +
+  geom_hline(yintercept=2, linetype="dashed", color = "#d9d9d9") +
+  geom_hline(yintercept=3, linetype="dashed", color = "#d9d9d9") +
+  geom_text(aes(gene, upper_95), hjust = 0, nudge_y = 0.35, size = 3) +
+  theme_cowplot() +
+  ylim(0,5.25) +
+  geom_pointrange(size = .75, stat = "identity", shape = 15, 
+                  aes(x = gene, ymin = lower_95, ymax = upper_95, y = HR, color = mutation_category)) +
+  scale_color_manual(name = "", values = c("DNA Methylation" = "#374E55FF", "Chromatin/Cohesin" = "#DF8F44FF", "RTK/RAS Signaling" = "#00A1D5FF", "Splicing" = "#B24745FF", "Transcription" = "#79AF97FF", "NPM1" = "#80796BFF", "Tumor suppressors" = "#6A6599FF")) +
+  ylab("Hazard Ratio")+
+  xlab(NULL) +
+  theme(legend.position = c(0.6,0.25),
+        axis.title.y=element_blank(),
+        axis.line.y = element_blank(),
+        axis.ticks.y = element_blank()) +
+  coord_flip()
+
+ggsave(filename = "~/Desktop/MetaAML_results/Figure_1/Supplimental/individual_gene_HR_forrest_plot_de_novo.pdf", dpi = 300, width = 9, height = 6, units = "in")
+
+
+
+
 
 
 # VAF per cohort ####
