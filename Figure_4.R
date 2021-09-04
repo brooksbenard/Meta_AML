@@ -9,7 +9,7 @@
 # Load packages ####
 # ================ #
 # Package names
-packages <- c("ggplot2", "tydyr" , "dplyr", "cometExactTest", "discover", "stringr", "maditr", "reshape2", "data.table", "epitools", "corrplot", "plyr", "muhaz", "reshape", "survival", "survivalAnalysis", "survMisc", "survminer", "ggsci", "vegan", "ggrepel", "ggforce", "rstatix", "effsize", "psych", "maxstat", "RCurl", "ggpubr", "UpSetR", "cowplot", "readxl", "scales", "rlist", "ggplotify", "ggridges", "gridExtra")
+packages <- c("ggplot2", "dplyr", "cometExactTest", "stringr", "maditr", "reshape2", "data.table", "epitools", "corrplot", "plyr", "muhaz", "reshape", "survival", "survivalAnalysis", "survMisc", "survminer", "ggsci", "vegan", "ggrepel", "ggforce", "rstatix", "effsize", "psych", "maxstat", "RCurl", "ggpubr", "UpSetR", "cowplot", "readxl", "scales", "rlist", "ggplotify", "ggridges", "gridExtra", "BradleyTerry2", "Matrix.utils")
 
 # Install packages not yet installed
 installed_packages <- packages %in% rownames(installed.packages())
@@ -259,12 +259,11 @@ a = ggplot(data = temp_dat_final_melted, aes(y=forcats::fct_rev(reorder(Gene_1,G
 print(a)
 
 ggsave(filename = "~/Desktop/MetaAML_results/Figure_4/order_of_mutations_de_novo.pdf", width = 7.5, height = 6, units = "in")
+write_csv(temp_dat_final_melted, "~/Desktop/MetaAML_results/Figure_4/order_of_mutations_de_novo.csv")
+
 
 # Bradley-Terry ####
 # calculate the mean fraction and confidence interval for each mutation in the pairwise presidence plot by the Bradly-Terry method
-
-if (!require('BradleyTerry2')) install.packages('BradleyTerry2'); library('BradleyTerry2')
-if (!require('Matrix.utils')) install.packages('Matrix.utils'); library('Matrix.utils')
 
 load("~/Desktop/MetaAML_results/final_data_matrix_2.RData")
 # final_data_matrix_2 = final_data_matrix
@@ -445,7 +444,7 @@ b=ggplot(BT_MetaAML_mutation_ordering,aes(reorder(factor(Gene), Estimate),
 print(b)
 
 ggsave(filename = "~/Desktop/MetaAML_results/Figure_4/bradley_terry_order_de_novo.pdf", width = 7.5, height = 6, units = "in")
-
+write.csv(BT_MetaAML_mutation_ordering, "~/Desktop/MetaAML_results/Figure_4/bradley_terry_order_de_novo.csv")
 
 #define the ordering based on the global pairwise analysis
 sub <- subset(final_data_matrix_2, final_data_matrix_2$mut_freq_gene >= 75 & final_data_matrix_2$Gene != "MLL" & final_data_matrix_2$Subset == "de_novo" & final_data_matrix_2$mut_freq_pt > 1)
@@ -728,7 +727,7 @@ for(i in 1:nrow(genes)){
   gene_1_and_2 <- gene_1_and_2[order(gene_1_and_2$Sample, -gene_1_and_2$VAF_CN_corrected.y),]
   gene_1_and_2 = gene_1_and_2[!duplicated(gene_1_and_2$Sample),]
   
-  if(nrow(gene_1_and_2) >= 10){
+  if(nrow(gene_1_and_2) >= 15){
     # add point color columns for visualizing clonal/subclonal trends
     gene_1_and_2$vaf_difference <- (gene_1_and_2$VAF_CN_corrected.x - gene_1_and_2$VAF_CN_corrected.y)
     
@@ -755,7 +754,7 @@ for(i in 1:nrow(genes)){
     gene_1_and_2 <- subset(gene_1_and_2, gene_1_and_2$Clonality != 0)
 
     # calculate the p value for surival between patients with subclonal mutations in gene 1 compared to those with subclonal mutations in gene 2
-    if(nrow(gene_2_and_clonal) >= 5 & nrow(gene_1_and_clonal) >= 5){
+    if(nrow(gene_2_and_clonal) >= 5 & nrow(gene_1_and_clonal) >= 5 & nrow(gene_1_and_2) >=15){
       print(i)
       gene_1_and_2$Censor.x = as.numeric(gene_1_and_2$Censor.x)
       
@@ -832,7 +831,6 @@ for(i in 1:nrow(genes)){
 temp_final_hr = as.data.frame(do.call(rbind, results_list))
 temp_final_hr$q_value <- p.adjust(temp_final_hr$log_rank_p, method = "fdr")
 
-
 write.csv(temp_final,  file = "~/Desktop/MetaAML_results/Figure_4/survival_by_vaf_ordering_co_occuring_mutations.csv", row.names = F)
 
 
@@ -876,25 +874,24 @@ temp_final_hr$gene1_gene2 = reorder(temp_final_hr$gene1_gene2, temp_final_hr$HR)
 
 temp_final_hr$Lower_CI = as.numeric(temp_final_hr$Lower_CI)
 temp_final_hr$Upper_CI = as.numeric(temp_final_hr$Upper_CI)
-
-
-coord_cartesian(ylim=c(0, 12))
-
-
- ggplot(temp_final_hr, aes(x = gene1_gene2, y = HR, label = p_text)) +
-  geom_hline(yintercept=1, linetype="dashed", color = "black") +
-  geom_text(aes(gene1_gene2, Upper_CI), hjust = 0, nudge_y = 1) +
-  geom_pointrange(size = .75, stat = "identity", shape = 19,
-                  aes(x = gene1_gene2, ymin = Lower_CI, ymax = Upper_CI, y = HR, color = sig_color)) +
-  scale_color_manual(values = c("0" = "darkgrey", "1" = "#1b7837"))+
-  theme_cowplot() +
-  ylab("Hazard Ratio")+
-  xlab(NULL)+
-  theme(legend.position = "none") +
-  coord_flip(ylim = c(0, 5.5))
-
-ggsave(filename = "~/Desktop/MetaAML_results/Figure_4/gene_order_hr_forest_plot_de_novo_05.pdf", dpi = 300, width = 4, height = 5, units = "in")
-
+ 
+ ggplot(temp_final_hr, aes(x = reorder(gene1_gene2, -HR), y = HR, label = p_text)) +
+   geom_hline(yintercept=1, linetype="dashed", color = "black") +
+   geom_text(aes(gene1_gene2, Upper_CI), hjust = 0, nudge_y = 0.5) +
+   geom_point(aes(size = n_both, color = sig_color), shape = 19, alpha = .9) +
+   geom_segment(data = temp_final_hr, aes(y = Lower_CI, yend = Upper_CI, x = gene1_gene2, xend = gene1_gene2, col= sig_color), size = 0.5) +
+   scale_color_manual(values = c("0" = "grey", "1" = "#1b7837", "2" = "#762a83"))+
+   ylab("Hazard Ratio\n(Mutation 1 before Mutation 2)")+
+   theme_cowplot() +
+   scale_size_area(max_size = 5,breaks=c(15,25,50,100, 200)) +
+   theme(legend.position = c(0.65, .2),
+         axis.title.y=element_blank()) +
+   coord_flip(ylim = c(0,10)) +
+   guides(color = FALSE,
+          size =  guide_legend(override.aes=list(colour="lightgrey"), title = "n. patients with\nnon-ambiguous\nordering"))
+ 
+ggsave(filename = "~/Desktop/MetaAML_results/Figure_4/gene_order_hr_forest_plot_de_novo_05.pdf", dpi = 300, width = 6, height = 7.5, units = "in")
+write_csv(temp_final_hr, "~/Desktop/MetaAML_results/Figure_4/gene_order_hr_forest_plot_de_novo_05.csv")
 
 
 
@@ -922,7 +919,7 @@ plot_list = list()
 
 for(j in 1:nrow(mut_cat)){
   print(j)
-  cat_1=subset(final_data_matrix_sub, final_data_matrix_sub$mutation_category == mut_cat[j,1])
+  cat_1 = subset(final_data_matrix_sub, final_data_matrix_sub$mutation_category == mut_cat[j,1])
   cat_2 = subset(final_data_matrix_sub, final_data_matrix_sub$mutation_category == mut_cat[j,2])
   
   # find patients in both groups and rbind
@@ -991,6 +988,8 @@ for(j in 1:nrow(mut_cat)){
   
   if(n1 > 15 & n3 > 15){
    
+    n_both = n1+n3
+    
     model <- coxph( Surv(Time_to_OS, Censor) ~ order,
                     data = final_sub)
     
@@ -1003,7 +1002,7 @@ for(j in 1:nrow(mut_cat)){
     array_dat[7] = summary(model)$sctest[3]
     array_dat = array_dat[-2]
     
-    forest_plot_data <- data.frame("Category_1" = array_dat[4], "Category_2" = array_dat[5], "HR" = array_dat[1], "Lower_CI" = array_dat[2], "Upper_CI" = array_dat[3], "log_rank_p" = array_dat[6])
+    forest_plot_data <- data.frame("Category_1" = array_dat[4], "Category_2" = array_dat[5], "HR" = array_dat[1], "Lower_CI" = array_dat[2], "Upper_CI" = array_dat[3], "log_rank_p" = array_dat[6], "n_both" = n_both)
     
     results_list[[n]] <- forest_plot_data
     n=n+1 
@@ -1023,7 +1022,7 @@ for(j in 1:nrow(mut_cat)){
     # find the p-value for the comparison of order
     p_val = round(summary(model)$sctest[3], 3)
     
-    # # plots the survival
+    # # # plots the survival
     surv_plot <- ggsurvplot(OS,
                             data = final,
                             log = (OS),
@@ -1057,9 +1056,9 @@ for(j in 1:nrow(mut_cat)){
                             legend = "none",
                             linetype = c("solid", "dashed", "solid"),
                             ggtheme = theme_cowplot())
-    
+
     plot_list[[j]] = surv_plot
-    
+
     print(surv_plot)
     png(filename = paste("~/Desktop/MetaAML_results/Figure_4/survival_by_muation_category_ordering/pngs/",g1,"_",g2, ".png", sep = ""), res = 300, width = 3.5, height = 3.5, units = "in")
     #
@@ -1108,7 +1107,7 @@ for(i in 1:nrow(temp_final_hr_categories_order)){
 temp_final_hr_categories_order$p_text = round(temp_final_hr_categories_order$p_text, 3)
 temp_final_hr_categories_order$fdr = round(temp_final_hr_categories_order$fdr, 1)
 
-temp_final_hr_categories_order$p_text = paste(" p =", temp_final_hr_categories_order$p_text, "; ", "q =", temp_final_hr_categories_order$fdr)
+temp_final_hr_categories_order$p_text = paste("p =", temp_final_hr_categories_order$p_text, "; ", "q =", temp_final_hr_categories_order$fdr, sep = "")
 
 for(i in 1:nrow(temp_final_hr_categories_order)){
   if(temp_final_hr_categories_order$log_rank_p[i] > 0.05){
@@ -1125,21 +1124,21 @@ temp_final_hr_categories_order$categories = reorder(temp_final_hr_categories_ord
 
 ggplot(temp_final_hr_categories_order, aes(x = reorder(categories, -HR), y = HR, label = p_text)) +
   geom_hline(yintercept=1, linetype="dashed", color = "black") +
-  geom_hline(yintercept=1.5, linetype="dashed", color = "lightgrey") +
-  geom_hline(yintercept=2, linetype="dashed", color = "lightgrey") +
-  geom_text(aes(categories, Upper_CI), hjust = 0, nudge_y = 0.1) +
-  geom_pointrange(size = .75, stat = "identity", shape = 19, 
-                  aes(x = categories, ymin = Lower_CI, ymax = Upper_CI, y = HR, color = sig_color)) +
-  scale_color_manual(values = c("0" = "#737373", "1" = "#762a83"))+
+  geom_text(aes(categories, Upper_CI), hjust = 0, nudge_y = 0.5) +
+  geom_point(aes(size = n_both, color = sig_color), shape = 19, alpha = .9) +
+  geom_segment(data = temp_final_hr_categories_order, aes(y = Lower_CI, yend = Upper_CI, x = categories, xend = categories, col= sig_color), size = 0.5) +
+  scale_color_manual(values = c("0" = "grey", "2" = "#1b7837", "1" = "#762a83"))+
+  ylab("Hazard Ratio\n(Category 1 before Category 2)")+
   theme_cowplot() +
-  ylab("Hazard Ratio")+
-  ylim(0,4.5) +
-  theme(legend.position = "none",
+  scale_size_area(max_size = 5,breaks=c(15,25,50,100, 200)) +
+  theme(legend.position = c(0.6, .2),
         axis.title.y=element_blank()) +
-  coord_flip()
+  coord_flip(ylim = c(0,4.5)) +
+  guides(color = FALSE,
+         size =  guide_legend(override.aes=list(colour="lightgrey"), title = "n. patients with\nnon-ambiguous\nordering"))
 
-ggsave(filename = "~/Desktop/MetaAML_results/Figure_4/gene_category_ordering_hr_forest_plot_de_novo_5.pdf", dpi = 300, width = 6.5, height = 4.5, units = "in")
-
+ggsave(filename = "~/Desktop/MetaAML_results/Figure_4/gene_category_ordering_hr_forest_plot_de_novo_5.pdf", dpi = 300, width = 7, height = 5, units = "in")
+write_csv(temp_final_hr_categories_order, "~/Desktop/MetaAML_results/Figure_4/gene_category_ordering_hr_forest_plot_de_novo_5.csv")
 
 
 

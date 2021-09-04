@@ -9,7 +9,7 @@
 # Load packages ####
 # ================ #
 # Package names
-packages <- c("ggplot2", "tydyr" , "dplyr", "cometExactTest", "discover", "stringr", "maditr", "reshape2", "data.table", "epitools", "corrplot", "plyr", "muhaz", "reshape", "survival", "survivalAnalysis", "survMisc", "survminer", "ggsci", "vegan", "ggrepel", "ggforce", "rstatix", "effsize", "psych")
+packages <- c("ggplot2", "dplyr", "cometExactTest", "discover", "stringr", "maditr", "reshape2", "data.table", "epitools", "corrplot", "plyr", "muhaz", "reshape", "survival", "survivalAnalysis", "survMisc", "survminer", "ggsci", "vegan", "ggrepel", "ggforce", "rstatix", "effsize", "psych")
 
 # Install packages not yet installed
 installed_packages <- packages %in% rownames(installed.packages())
@@ -1120,7 +1120,7 @@ p3  = p3 + guides(size = FALSE, color = FALSE, fill = FALSE) +
 
  ggsave(filename = "~/Desktop/MetaAML_results/Figure_2/correlation_of_odds_ratio_and_HR_de_novo_2.pdf", dpi = 300, width = 5, height = 5, units = "in")
 
-  write.csv(hr_odds, "~/Desktop/MetaAML_results/Data/Tables/correlation_of_odds_ratio_and_HR_de_novo.pdf.csv")
+  write.csv(hr_odds, "~/Desktop/MetaAML_results/Data/Tables/correlation_of_odds_ratio_and_HR_de_novo.csv")
 
 # test the enrichment of poor outcomes based on odds ratio
 
@@ -2300,6 +2300,3 @@ p = (p1 + p2) / (p3 + p4)
 p1 + p2 + p3 + p4 +plot_layout(widths = c(5, 1), heights = c(1,1))
 
 ggsave(filename = "~/Desktop/Majeti_Lab/Manuscripts/Meta_AML/Final_submission_materials/Nat_Comm/Revisions/Comment_4/convergent_panel_2.pdf", dpi = 300, width = 20, height = 7.5, units = "in")
-
-
-

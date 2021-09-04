@@ -1255,7 +1255,7 @@ for(i in 1:nrow(final_data_matrix)){
   if(!is.na(final_data_matrix$Sex[i])){
     if(!is.na(final_data_matrix$VAF[i])){
       if(final_data_matrix$Sex[i] == "Male"){
-        if(final_data_matrix$symbol[i] %chin% x_genes$Symbol){
+        if(final_data_matrix$Gene[i] %chin% x_genes$Symbol){
           final_data_matrix$VAF_male_x[i] <- (final_data_matrix$VAF[i])/2
         } else {
           final_data_matrix$VAF_male_x[i] <- final_data_matrix$VAF[i]
@@ -1305,11 +1305,13 @@ for(i in 1:nrow(final_data_matrix)){
 
 # complex karyotype
 for(i in 1:nrow(final_data_matrix)){
-  if(final_data_matrix$Cohort[i] == "Papaemmanuil" & final_data_matrix$Cytogenetics[i] == 1){
-    final_data_matrix$Cytogenetics[i] = "Complex Cytogenetics"
-  }
-  if(final_data_matrix$Cohort[i] == "Papaemmanuil" & final_data_matrix$Cytogenetics[i] == 0){
-    final_data_matrix$Cytogenetics[i] = "Normal Karyotype"
+  if(!is.na(final_data_matrix$Cytogenetics[i])){
+    if(final_data_matrix$Cohort[i] == "Papaemmanuil" & final_data_matrix$Cytogenetics[i] == 1){
+      final_data_matrix$Cytogenetics[i] = "Complex Cytogenetics"
+    }
+    if(final_data_matrix$Cohort[i] == "Papaemmanuil" & final_data_matrix$Cytogenetics[i] == 0){
+      final_data_matrix$Cytogenetics[i] = "Normal Karyotype"
+    }
   }
 }
 
@@ -1469,6 +1471,7 @@ for(i in 1:nrow(upset_matrix)){
 upset_matrix$Sample = NULL
 upset_matrix$Cohort = as.factor(upset_matrix$Cohort)
 
+write.csv(upset_matrix, "~/Desktop/MetaAML_results/Figure_1/cohort_upset_plot.csv")
 
 p = upset(upset_matrix,
           nsets = 7,
@@ -1698,7 +1701,11 @@ fig1B
 print(fig1B)
 dev.off()
 
+# write out raw data for source data in manuscript
+source_data = final_data_matrix %>%
+  select(Sample, Gene, variant_type, Subset, specimenType, Cohort, Sex, Risk, Time_to_OS)
 
+write_csv(source_data, "~/Desktop/MetaAML_results/Figure_1/cohort_oncoprint_100.csv")
 
 #### Supplimental ####
 # treatment histories ####

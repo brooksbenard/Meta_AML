@@ -9,7 +9,7 @@
 # Load packages ####
 # ================ #
 # Package names
-packages <- c("ggplot2", "tydyr" , "dplyr", "cometExactTest", "discover", "stringr", "maditr", "reshape2", "data.table", "epitools", "corrplot", "plyr", "muhaz", "reshape", "survival", "survivalAnalysis", "survMisc", "survminer", "ggsci", "vegan", "ggrepel", "ggforce", "rstatix", "effsize", "psych", "maxstat", "RCurl", "ggpubr", "UpSetR", "cowplot", "readxl", "scales", "rlist")
+packages <- c("ggplot2",  "dplyr", "cometExactTest", "stringr", "maditr", "reshape2", "data.table", "epitools", "corrplot", "plyr", "muhaz", "reshape", "survival", "survivalAnalysis", "survMisc", "survminer", "ggsci", "vegan", "ggrepel", "ggforce", "rstatix", "effsize", "psych", "maxstat", "RCurl", "ggpubr", "UpSetR", "cowplot", "readxl", "scales", "rlist", "tidyverse", "PupillometryR")
 
 # Install packages not yet installed
 installed_packages <- packages %in% rownames(installed.packages())
@@ -248,27 +248,27 @@ cohort_aggrigate$Cytogenetics = gsub('\\s+', '', cohort_aggrigate$Cytogenetics)
 cohort_aggrigate$VAF_CN_corrected = NA
 
 for(i in 1:nrow(cohort_aggrigate)){
-  
-  # find whole chromosome gains or losses
-  ch_gain = paste("\\+",cohort_aggrigate$Chromosome.scaffold.name[i], ",", sep = "")
-  ch_loss = paste("\\-",cohort_aggrigate$Chromosome.scaffold.name[i], ",", sep = "")
-  
-  # correct for VAF based on copy number gains for that chromosome  
-  if(grepl(ch_gain, cohort_aggrigate$Cytogenetics[i]) & cohort_aggrigate$VAF[i] > 35) {cohort_aggrigate$VAF_CN_corrected[i] = cohort_aggrigate$VAF[i]*0.75}
-  if(grepl(ch_gain, cohort_aggrigate$Cytogenetics[i]) & cohort_aggrigate$VAF[i] <= 35) {cohort_aggrigate$VAF_CN_corrected[i] = cohort_aggrigate$VAF[i]*1.5}
-  # correct for VAF based on copy number loss for that chromosome
-  if(grepl(ch_loss, cohort_aggrigate$Cytogenetics[i])){ cohort_aggrigate$VAF_CN_corrected[i] = cohort_aggrigate$VAF[i]/2}
-  
-  # find focal chromosome gains or losses
-  locus_gain = paste("add",cohort_aggrigate$partial_annotation[i],"|","add",cohort_aggrigate$full_annotation[i], sep = "")
-  locus_loss = paste("del",cohort_aggrigate$partial_annotation[i],"|","del",cohort_aggrigate$full_annotation[i], sep = "")
-  
-  # correct for VAF based on broad copy number gains at the gene locus  
-  if(grepl(locus_gain, cohort_aggrigate$Cytogenetics[i], fixed = T) & cohort_aggrigate$VAF[i] > 35){ cohort_aggrigate$VAF_CN_corrected[i] = cohort_aggrigate$VAF[i]*0.75}
-  if(grepl(locus_gain, cohort_aggrigate$Cytogenetics[i], fixed = T) & cohort_aggrigate$VAF[i] <= 35){ cohort_aggrigate$VAF_CN_corrected[i] = cohort_aggrigate$VAF[i]*1.5}
-  # correct for VAF based on broad copy number loss at the gene locus
-  if(grepl(locus_loss, cohort_aggrigate$Cytogenetics[i], fixed = T)){ cohort_aggrigate$VAF_CN_corrected[i] = cohort_aggrigate$VAF[i]/2}
-
+  if(!is.na(cohort_aggrigate$VAF_male_x[i])){
+    # find whole chromosome gains or losses
+    ch_gain = paste("+",cohort_aggrigate$Chromosome.scaffold.name[i], ",", sep = "")
+    ch_loss = paste("-",cohort_aggrigate$Chromosome.scaffold.name[i], ",", sep = "")
+    
+    # correct for VAF based on copy number gains for that chromosome  
+    if(grepl(ch_gain, cohort_aggrigate$Cytogenetics[i]) & cohort_aggrigate$VAF_male_x[i] > 35) {cohort_aggrigate$VAF_CN_corrected[i] = cohort_aggrigate$VAF_male_x[i]*0.75}
+    if(grepl(ch_gain, cohort_aggrigate$Cytogenetics[i]) & cohort_aggrigate$VAF_male_x[i] <= 35) {cohort_aggrigate$VAF_CN_corrected[i] = cohort_aggrigate$VAF_male_x[i]*1.5}
+    # correct for VAF based on copy number loss for that chromosome
+    if(grepl(ch_loss, cohort_aggrigate$Cytogenetics[i])){ cohort_aggrigate$VAF_CN_corrected[i] = cohort_aggrigate$VAF_male_x[i]/2}
+    
+    # find focal chromosome gains or losses
+    locus_gain = paste("add",cohort_aggrigate$partial_annotation[i],"|","add",cohort_aggrigate$full_annotation[i], sep = "")
+    locus_loss = paste("del",cohort_aggrigate$partial_annotation[i],"|","del",cohort_aggrigate$full_annotation[i], sep = "")
+    
+    # correct for VAF based on broad copy number gains at the gene locus  
+    if(grepl(locus_gain, cohort_aggrigate$Cytogenetics[i], fixed = T) & cohort_aggrigate$VAF_male_x[i] > 35){ cohort_aggrigate$VAF_CN_corrected[i] = cohort_aggrigate$VAF_male_x[i]*0.75}
+    if(grepl(locus_gain, cohort_aggrigate$Cytogenetics[i], fixed = T) & cohort_aggrigate$VAF_male_x[i] <= 35){ cohort_aggrigate$VAF_CN_corrected[i] = cohort_aggrigate$VAF_male_x[i]*1.5}
+    # correct for VAF based on broad copy number loss at the gene locus
+    if(grepl(locus_loss, cohort_aggrigate$Cytogenetics[i], fixed = T)){ cohort_aggrigate$VAF_CN_corrected[i] = cohort_aggrigate$VAF_male_x[i]/2}
+  }
 }
 
 # TP53 is a unique case. Code manually for focal deletions
@@ -276,13 +276,10 @@ tp53_loss1 = "del(17)(p13)"
 tp53_loss2 = "del(17)(p11.2p13)"
 
 for(i in 1:nrow(cohort_aggrigate)){
-  # if no copy number differenes detected, populate the raw VAF
   if(grepl(tp53_loss1, cohort_aggrigate$Cytogenetics[i]) & cohort_aggrigate$Gene[i] == "TP53") { cohort_aggrigate$VAF_CN_corrected[i] = cohort_aggrigate$VAF[i]/2}
-  
   if(grepl(tp53_loss2, cohort_aggrigate$Cytogenetics[i], fixed = T) & cohort_aggrigate$Gene[i] == "TP53") { cohort_aggrigate$VAF_CN_corrected[i] = cohort_aggrigate$VAF[i]/2}
-  
 }
-
+# if no copy number differenes detected, populate the raw VAF
 for(i in 1:nrow(cohort_aggrigate)){
   if(is.na(cohort_aggrigate$VAF_CN_corrected[i])) { cohort_aggrigate$VAF_CN_corrected[i] = cohort_aggrigate$VAF_male_x[i]}
 }
@@ -293,7 +290,7 @@ tcga_dat$cn = NULL
 cohort_aggrigate[,28:32] = NULL
 
 # bind all cohorts together
-final_data_matrix = rbind(papaemmanuil_corrected, tcga_dat, cohort_aggrigate)
+final_data_matrix = rbind(papaemmanuil_corrected, tcga_dat, cohort_aggrigate, fill = TRUE)
 final_data_matrix_2 = subset(final_data_matrix, final_data_matrix$Subset == "de_novo" & final_data_matrix$VAF_CN_corrected > 0)
 save(final_data_matrix_2,  file = "~/Desktop/MetaAML_results/final_data_matrix_2.RData")
 
@@ -404,6 +401,41 @@ p = ggplot(threshold_list_all, aes(x=Gene, y=VAF_CN_corrected)) +
 ggpar(p, legend.title = "")
 ggsave(filename = "~/Desktop/MetaAML_results/Figure_3/MetaAML_vaf_distribution_median_corrected.pdf", dpi = 300, width = 10, height = 2.5, units = "in")
 
+
+counts = as.data.frame(table(threshold_list_all$Gene))
+names(counts)[1] = "Gene"
+
+p =  ggplot(threshold_list_all, aes(x = Gene, y = VAF_CN_corrected)) +
+    # ggtitle("Main Plot Title") +
+    ylab("VAF") +
+    xlab(NULL) +
+    theme_cowplot(font_size = 10) +
+    scale_shape_identity() +
+    scale_colour_brewer(palette = "Set1") +
+    scale_fill_manual(values = c("#cb181d", "#3690c0")) +
+    geom_point(aes(fill = median_threshold_NA), alpha = 0.5, color = "black", shape = 21, position=position_jitter(0.15), size = 1) +
+    geom_flat_violin(position = position_nudge(x = 0.3, y = 0),
+                     color = "grey", fill = "lightgrey",
+                     adjust = 2,
+                     alpha = 0.6, 
+                     trim = TRUE, 
+                     scale = "width") +
+    geom_boxplot(position = position_nudge(x = 0.3, y = 0),
+                 notch = FALSE, 
+                 width = 0.2, 
+                 varwidth = FALSE, 
+                 outlier.shape = NA, 
+                 alpha = 0.3, 
+                 colour = "black", 
+                 show.legend = FALSE) +
+    theme(legend.position="right", axis.text.x = element_text(angle = 45, vjust = 1, hjust = 1))  
+# +
+#   geom_text(data = counts, aes(x = Gene, y = 105, label = Freq), size = 2, position=position_dodge(width=1.0), color = "lightgrey")
+  ggpar(p, legend.title = "VAF")
+
+  ggsave(filename = "~/Desktop/MetaAML_results/Figure_3/MetaAML_vaf_distribution_median_corrected_raincloud.pdf", dpi = 300, width = 10, height = 2.5, units = "in")
+
+  write.csv(threshold_list_all, "~/Desktop/MetaAML_results/Figure_3/MetaAML_vaf_distribution_median_corrected_raincloud.csv")
 
 
 # analyze the clinical features that associate with high or low vaf per gene
@@ -720,9 +752,8 @@ p = ggplot(var2_adj_list, aes(x = Mutated_Gene, y = effect_size, label = p_value
 
 p + facet_grid(. ~ Variable)
 
-
 p + facet_grid(. ~ Variable) +
-  theme(strip.background = element_rect(colour="black", fill="white",
+  theme(strip.background = element_rect(colour="black", fill= "white",
                                         size=1.5, linetype="solid"))
 
 ggsave(filename = "~/Desktop/MetaAML_results/Figure_3/VAF_clinical_features_discrete.png", dpi = 300, width = 15, height = 6, units = "in") 
@@ -1060,6 +1091,7 @@ h = guide_legend("VAF HR")
 p  + guides(color = h, size = g)
 
 ggsave(filename = "~/Desktop/MetaAML_results/Figure_3/HR_vs_VAF_HR.pdf", dpi = 300, width = 4.5, height = 6, units = "in")
+write_csv(hr_comparision, "~/Desktop/MetaAML_results/Figure_3/HR_vs_VAF_HR.csv")
 
 
 # Effect size differences ####
@@ -1125,7 +1157,7 @@ p + facet_wrap(. ~ Variable, ncol = 1, nrow = 2) + guides(size = g, color = FALS
                                     size=1.5, linetype="solid")) + guides(color = h, size = g) 
 
 ggsave(filename = "~/Desktop/MetaAML_results/Figure_3/WBC_ES_vs_VAF_ES.pdf", dpi = 300, width = 5, height = 6, units = "in")
-
+write_csv(es_comparision, "~/Desktop/MetaAML_results/Figure_3/WBC_ES_vs_VAF_ES.csv")
 
 
 # Supplimental ####
@@ -1607,105 +1639,4 @@ ggsave(filename = "~/Desktop/MetaAML_results/Figure_3/Supplimental/Median_VAF/ge
 write.csv(temp_final_median, "~/Desktop/MetaAML_results/Figure_3/Supplimental/Median_VAF/static_vaf_threshold_survival.csv")
 
 
-
-
-
-
-# VAF correlation between mutations ####
-final_data_matrix_2_sub <- subset(final_data_matrix_2, !Cohort %in% c("Au","Wang","Garg","Huet"))
-final_data_matrix_2_sub <- subset(final_data_matrix_2_sub, Gene!="MLL")
-
-final_data_matrix_2_sub <- subset(final_data_matrix_2_sub, final_data_matrix_2_sub$mut_freq_gene > 50 & final_data_matrix_2_sub$Subset == "de_novo")
-
-final_data_matrix_2_sub = data.frame(select(final_data_matrix_2_sub, Sample, Gene, VAF))
-
-final_data_matrix_2_sub = final_data_matrix_2_sub %>% 
-  group_by(Sample,Gene) %>% 
-  summarise(VAF = max(VAF))
-
-final_data_matrix_2_sub = dcast(final_data_matrix_2_sub, Sample~Gene, value.var="VAF")
-
-rownames(final_data_matrix_2_sub) = final_data_matrix_2_sub$Sample
-final_data_matrix_2_sub = final_data_matrix_2_sub[,-1]
-
-final_data_matrix_2_sub[is.na(final_data_matrix_2_sub)] <- 0
-
-corr_mat=cor(final_data_matrix_2_sub,method="p")
-
-# p values
-# mat : is a matrix of data
-# ... : further arguments to pass to the native R cor.test function
-cor.mtest <- function(mat, ...) {
-  mat <- as.matrix(mat)
-  n <- ncol(mat)
-  p.mat<- matrix(NA, n, n)
-  diag(p.mat) <- 0
-  for (i in 1:(n - 1)) {
-    for (j in (i + 1):n) {
-      tmp <- cor.test(mat[, i], mat[, j], ...)
-      p.mat[i, j] <- p.mat[j, i] <- tmp$p.value
-    }
-  }
-  colnames(p.mat) <- rownames(p.mat) <- colnames(mat)
-  p.mat
-}
-# matrix of the p-value of the correlation
-p.mat <- cor.mtest(final_data_matrix_2_sub)
-
-library(RColorBrewer)
-
-
-pdf(file = "~/Desktop/MetaAML_results/Figure_3/Supplimental/correlation_by_vaf.pdf", width = 7.5, height = 7.5)
-
-corrplot(corr_mat, is.corr = F, type="upper", order="hclust",tl.col="black", outline = F, addgrid.col = "lightgrey",
-         col = brewer.pal(n = 8, name = "RdBu"), p.mat = p.mat, diag=FALSE,insig = "label_sig",
-         sig.level = c(.001, .01, .1), pch.cex = .9, pch.col = "black", na.label = "square", na.label.col = "white")
-dev.off()
-
-
-# cluster based on the VAFs ####
-final_data_matrix_2_sub <- final_data_matrix_2
-
-final_data_matrix_2_sub <- subset(final_data_matrix_2_sub, mut_freq_gene > 50 & Subset == "de_novo")
-final_data_matrix_2_sub <- subset(final_data_matrix_2_sub, Gene != "MLL")
-
-final_data_matrix_2_sub <- select(final_data_matrix_2_sub, Sample, Gene, VAF)
-final_data_matrix_2_sub$VAF <- as.numeric(as.character(final_data_matrix_2_sub$VAF))
-final_data_matrix_2_sub$VAF <- round(final_data_matrix_2_sub$VAF, 3)
-# dup <- as.data.frame(duplicated(final_data_matrix_2_sub[c("Sample", "Gene")]))
-
-# identify patients where the same gene is mutated twice and generate a duplicate patient to represent this additional mutation
-for(i in 1:nrow(final_data_matrix_2_sub)){
-  n <- as.character(final_data_matrix_2_sub$Sample[i])
-  m <- as.character(final_data_matrix_2_sub$Gene[i])
-  sub1 <- subset(final_data_matrix_2_sub, final_data_matrix_2_sub$Sample == n & final_data_matrix_2_sub$Gene == m)
-  if(nrow(sub1) > 1){
-    for(j in 2:nrow(sub1)){
-      rn <- row_number(sub1)
-      final_data_matrix_2_sub$Sample[i] <- paste(n, "_", rn, sep="")
-    }
-  }
-}
-
-final_data_matrix_2_sub <- dcast(final_data_matrix_2_sub, Sample ~ Gene, value.var="VAF")
-
-rownames(final_data_matrix_2_sub) <- final_data_matrix_2_sub$Sample
-final_data_matrix_2_sub$Sample <- NULL
-final_data_matrix_2_sub[is.na(final_data_matrix_2_sub)] <- 0
-
-final_data_matrix_2_sub = t(data.matrix(final_data_matrix_2_sub))
-
-# cluster and viauslize the data
-install.packages("pheatmap")
-library("pheatmap")
-
-p = pheatmap(final_data_matrix_2_sub, 
-             border_color = NA,
-             show_colnames = F,
-             cluster_rows = T,
-             cluster_cols = T
-             # kmeans_k = 10
-)
-
-ggsave(p, filename = "~/Desktop/MetaAML_results/Figure_3/Supplimental/cluster_by_vaf.pdf", dpi = 300, width = 5, height = 5, units = "in")
 

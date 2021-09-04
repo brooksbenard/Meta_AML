@@ -207,7 +207,8 @@ Beat_AML_muts$symbol <- with(Beat_AML_muts, reorder(symbol, -VAF_CN_corrected, m
 p = ggplot(Beat_AML_muts, aes(x=symbol, y=VAF_CN_corrected)) + 
   geom_boxplot(notch=F, outlier.colour = "white", color = "#374E55FF", fill = "lightgrey") +
   geom_jitter(aes(fill = variant_class), color = "black", shape = 21, position=position_jitter(0.2), size = 2.5) +
-  scale_fill_manual(values = c(Deletion = "#374E55FF", INDEL = "#DF8F44FF", Insertion = "#00A1D5FF", ITD = "#79AF97FF", SNV = "#B24745FF", Splicing = "#6A6599FF", Unknown = "#80796BFF")) +
+  # scale_fill_manual(values = c(Deletion = "#374E55FF", INDEL = "#DF8F44FF", Insertion = "#00A1D5FF", ITD = "#79AF97FF", SNV = "#B24745FF", Splicing = "#6A6599FF", Unknown = "#80796BFF")) +
+  scale_fill_manual(values = c(Insertion = "#00A1D5FF", ITD = "#79AF97FF", SNV = "#B24745FF")) +
   theme_cowplot(font_size = 15) +
   labs(title = NULL) +
   ylab(label = "VAF") +
@@ -215,10 +216,45 @@ p = ggplot(Beat_AML_muts, aes(x=symbol, y=VAF_CN_corrected)) +
   theme(legend.position="right") +
   theme(axis.text.x = element_text(angle = 45, vjust = 1, 
                                    size = 12, hjust = 1))
-
 ggpar(p, legend.title = "Variant type")
 
 ggsave(filename = "~/Desktop/MetaAML_results/Figure_6/vaf_distribution_de_novo.pdf", dpi = 300, width = 8, height = 5, units = "in")
+
+
+counts = as.data.frame(table(threshold_list_all$Gene))
+names(counts)[1] = "Gene"
+
+p =  ggplot(Beat_AML_muts, aes(x = symbol, y = VAF_CN_corrected)) +
+  # ggtitle("Main Plot Title") +
+  ylab("VAF") +
+  xlab(NULL) +
+  theme_cowplot(font_size = 15) +
+  scale_shape_identity() +
+  scale_fill_manual(values = c(Insertion = "#00A1D5FF", ITD = "#79AF97FF", SNV = "#B24745FF")) +
+  geom_jitter(aes(fill = variant_class), color = "black", shape = 21, position=position_jitter(0.1), size = 2) +
+  geom_flat_violin(position = position_nudge(x = 0.3, y = 0),
+                   color = "grey", fill = "lightgrey",
+                   adjust = 2,
+                   alpha = 0.6, 
+                   trim = TRUE, 
+                   scale = "width") +
+  geom_boxplot(position = position_nudge(x = 0.3, y = 0),
+               notch = FALSE, 
+               width = 0.2, 
+               varwidth = FALSE, 
+               outlier.shape = NA, 
+               alpha = 0.3, 
+               colour = "black", 
+               show.legend = FALSE) +
+  theme(legend.position="right", axis.text.x = element_text(angle = 45, vjust = 1, hjust = 1))  
+ggpar(p, legend.title = "Variant type")
+
+ggsave(filename = "~/Desktop/MetaAML_results/Figure_6/vaf_distribution_de_novo_raincloud.pdf", dpi = 300, width = 8, height = 5.5, units = "in")
+write_csv(Beat_AML_muts, "~/Desktop/MetaAML_results/Figure_6/vaf_distribution_de_novo_raincloud.csv")
+
+
+
+
 
 # plot the difference in VAF distribution per gene after CNA correction
 raw_vaf = select(BeatAML_aggrigate, symbol, t_vaf)
@@ -714,17 +750,30 @@ drug_mutation_binary_function = function(sample_subset, individual_plots){
               
               subdat_uniq2$mutated <- factor(subdat_uniq2$mutated , levels=c("WT", "Mut"))
               
-              ggplot(subdat_uniq2, aes(x=mutated, y=auc)) + 
-                geom_boxplot(notch=F, outlier.colour = "white", color = "#374E55FF", fill = "lightgrey") +
-                geom_jitter(aes(fill = mutated), color = "black", shape = 21, position=position_jitter(0.2), size = 2) +
-                scale_fill_manual(values = c("WT"="lightgrey", "Mut" = "#2166ac")) +
-                stat_compare_means() +
-                theme_cowplot(font_size = 10) +
-                labs(title = paste(drug, " vs. ", gene_name, sep = "")) +
+              ggplot(subdat_uniq2, aes(x = mutated, y = auc)) +
                 ylab(label= "AUC") +
                 xlab(label = NULL) +
+                theme_cowplot(font_size = 12) +
+                stat_compare_means() +
+                scale_fill_manual(values = c("WT"="lightgrey", "Mut" = "#b2182b")) +
+                labs(title = paste(drug, " vs. ", gene_name, sep = "")) +
                 ylim((min(subdat_uniq2$auc)), (max(subdat_uniq2$auc) + 15)) +
-                theme(legend.position="none")  
+                theme(legend.position="none")  +
+                geom_point(aes(fill = mutated), color = "black", shape = 21, position=position_jitter(0.15), size = 2) +
+                geom_flat_violin(position = position_nudge(x = 0.3, y = 0),
+                                 color = "grey", fill = "lightgrey",
+                                 adjust = 2,
+                                 alpha = 0.6, 
+                                 trim = TRUE, 
+                                 scale = "width") +
+                geom_boxplot(position = position_nudge(x = 0.3, y = 0),
+                             notch = FALSE, 
+                             width = 0.2, 
+                             varwidth = FALSE, 
+                             outlier.shape = NA, 
+                             alpha = 0.3, 
+                             colour = "black", 
+                             show.legend = FALSE)
               
               ggsave(filename = paste("~/Desktop/MetaAML_results/Figure_6/Supplimental/drug_vaf_correlation/binary/",sample_subset,"/Sensitive/",drug,"_",gene_name,".pdf", sep = ""), dpi = 300, width = 3, height = 3, units = "in")
             }
@@ -732,18 +781,31 @@ drug_mutation_binary_function = function(sample_subset, individual_plots){
               
               subdat_uniq2$mutated <- factor(subdat_uniq2$mutated , levels=c("WT", "Mut"))
               
-              ggplot(subdat_uniq2, aes(x=mutated, y=auc)) + 
-                geom_boxplot(notch=F, outlier.colour = "white", color = "#374E55FF", fill = "lightgrey") +
-                geom_jitter(aes(fill = mutated), color = "black", shape = 21, position=position_jitter(0.2), size = 2) +
-                scale_fill_manual(values = c("WT"="lightgrey", "Mut" = "#b2182b")) +
-                stat_compare_means() +
-                theme_cowplot(font_size = 10) +
-                labs(title = paste(drug, " vs. ", gene_name, sep = "")) +
+              ggplot(subdat_uniq2, aes(x = mutated, y = auc)) +
                 ylab(label= "AUC") +
                 xlab(label = NULL) +
+                theme_cowplot(font_size = 12) +
+                stat_compare_means() +
+                scale_fill_manual(values = c("WT"="lightgrey", "Mut" = "#4393c3")) +
+                labs(title = paste(drug, " vs. ", gene_name, sep = "")) +
                 ylim((min(subdat_uniq2$auc)), (max(subdat_uniq2$auc) + 15)) +
-                theme(legend.position="none")   
-              
+                theme(legend.position="none")  +
+                geom_point(aes(fill = mutated), color = "black", shape = 21, position=position_jitter(0.15), size = 2) +
+                geom_flat_violin(position = position_nudge(x = 0.3, y = 0),
+                                 color = "grey", fill = "lightgrey",
+                                 adjust = 2,
+                                 alpha = 0.6, 
+                                 trim = TRUE, 
+                                 scale = "width") +
+                geom_boxplot(position = position_nudge(x = 0.3, y = 0),
+                             notch = FALSE, 
+                             width = 0.2, 
+                             varwidth = FALSE, 
+                             outlier.shape = NA, 
+                             alpha = 0.3, 
+                             colour = "black", 
+                             show.legend = FALSE)
+
               ggsave(filename = paste("~/Desktop/MetaAML_results/Figure_6/Supplimental/drug_vaf_correlation/binary/",sample_subset,"/Resistant/",drug,"_",gene_name,".pdf", sep = ""), dpi = 300, width = 3, height = 3, units = "in")
             }
           }
@@ -839,7 +901,7 @@ drug_mutation_binary_function = function(sample_subset, individual_plots){
   
 }
 
-drug_mutation_binary_function(sample_subset = "de_novo", individual_plots = "no")
+drug_mutation_binary_function(sample_subset = "de_novo", individual_plots = "yes")
 drug_mutation_binary_function("secondary", individual_plots = "yes")
 drug_mutation_binary_function("all", individual_plots = "yes")
 

@@ -35,7 +35,7 @@
 # 1. Packages, libraries, and working directory   ####
 ######################################################
 # Package names
-packages <- c("ggplot2", "tidyverse", "viridis", "viridisLite", "RColorBrewer", "tydyr", "dplyr", "cometExactTest", "discover", "stringr", "maditr", "reshape2", "data.table", "epitools", "corrplot", "plyr", "muhaz", "reshape", "survival", "survivalAnalysis", "survMisc", "survminer", "ggsci", "vegan", "ggrepel", "ggforce", "rstatix", "effsize", "psych", "maxstat", "RCurl", "ggpubr", "UpSetR", "cowplot", "readxl", "scales", "rlist", "ggplotify", "ggridges", "gridExtra", "magrittr", "stats", "gage", "fgsea", "GSA", "MAGeCKFlute", "devtools", "gridBase", "igraph", "packcircles")
+packages <- c("ggplot2", "tidyverse", "viridis", "viridisLite", "RColorBrewer", "tydyr", "plyr", "dplyr", "cometExactTest", "discover", "stringr", "maditr", "reshape2", "data.table", "epitools", "corrplot", "plyr", "muhaz", "reshape", "survival", "survivalAnalysis", "survMisc", "survminer", "ggsci", "vegan", "ggrepel", "ggforce", "rstatix", "effsize", "psych", "maxstat", "RCurl", "ggpubr", "UpSetR", "cowplot", "readxl", "scales", "rlist", "ggplotify", "ggridges", "gridExtra", "magrittr", "stats", "gage", "fgsea", "GSA", "MAGeCKFlute", "devtools", "gridBase", "igraph", "packcircles")
 
 # Install packages not yet installed
 installed_packages <- packages %in% rownames(installed.packages())
@@ -2217,17 +2217,62 @@ ggsurvplot(fit, pval = T, conf.int = FALSE,  xlab = "Years", risk.table = FALSE,
 # Mutation burden vs. clonality and difference in clonality and mutation burden by tracjetory #
 ###############################################################################################
 data_for_plot <- PyClone %>%
-  select(PATIENT_ID, number_of_clones, total_mutations) %>%
+  select(PATIENT_ID, number_of_clones, total_mutations, isDenovo) %>%
+  subset(isDenovo == "TRUE") %>% 
   distinct() %>%
   mutate(number_of_clones_color = ifelse(number_of_clones <= 5, "1-5", "6+")) %>%
   mutate(number_of_clones = factor(number_of_clones)) %>%
-  mutate(is_branched = ifelse(PATIENT_ID %in% branched, TRUE, FALSE)) %>%
+  mutate(is_branched = ifelse(PATIENT_ID %in% branched, "Branched", "Linear")) %>%
   na.omit() 
 
 ## with linear and branched stratification
 p_kruskal = kruskal.test(total_mutations ~ number_of_clones, data = data_for_plot)$p.val
 
-ggplot(data_for_plot, aes(number_of_clones, total_mutations, fill = number_of_clones_color)) + theme_cowplot() + geom_boxplot(outlier.shape = NA) + geom_jitter(data = data_for_plot[which(!data_for_plot$is_branched),], aes(x = number_of_clones, y = total_mutations, alpha = .5), color = "black", width = 0.2) +  geom_jitter(data = data_for_plot[which(data_for_plot$is_branched),], aes(x = number_of_clones, y = total_mutations, alpha = .5), color = "red", width = 0.2) + scale_fill_manual(values = cbPalette) +  theme(legend.position = "none") + xlab("Number of Clones") + ylab("Number of Mutations") + annotate("text", x = 10, y = 30, label = "Kruskal-Wallis, p = 1.6e-33") + annotate("text", x = 10, y = 28, label = "black = linear evolution") + annotate("text", x = 10, y = 26, label = "red = branched evolution")  + ggsave("Mutations_vs_Clonality_linear_and_branched.pdf", units = "in", height = 3, width = 4, dpi=300)
+ggplot(data_for_plot, aes(x = number_of_clones, y = total_mutations)) +
+  ylab(label= "# of Driver Mutations") +
+  xlab(label = "Number of Clones") +
+  theme_cowplot() +
+  theme(legend.position=c(0.7, 0.95), legend.title = element_blank())  +
+  geom_point(aes(fill = is_branched), subset = .(is_branched == 'Branched'), color = "black", shape = 21, position=position_jitter(0.1), size = 1.5) +
+  geom_flat_violin(position = position_nudge(x = 0.3, y = 0),
+                   color = "black", fill = "lightgrey",
+                   adjust = 2,
+                   alpha = 0.6, 
+                   trim = TRUE, 
+                   scale = "width") +
+  geom_boxplot(position = position_nudge(x = 0.3, y = 0),
+               notch = FALSE, 
+               width = 0.2, 
+               varwidth = FALSE, 
+               outlier.shape = NA, 
+               alpha = 0.3, 
+               colour = "black", 
+               show.legend = FALSE) +
+scale_fill_manual(values = c("Linear" = "darkgrey", "Branched" = "#0072B2")) +
+  annotate("text", x = 12, y = 1, label = "Kruskal-Wallis, p = 1.6e-33", size = 3) 
+  
+ ggsave("~/Desktop/MetaAML_results/Figure_5/PyClone/Final_Graphs/Figure_Graphs/Mutations_vs_Clonality_linear_and_branched_raincloud.pdf", units = "in", height = 3, width = 4, dpi=300)
+
+
+
+
+
+
+
+ggplot(data_for_plot, aes(number_of_clones, total_mutations, fill = number_of_clones_color)) + 
+  theme_cowplot() + 
+  geom_boxplot(outlier.shape = NA) + 
+  geom_jitter(data = data_for_plot[which(!data_for_plot$is_branched),], aes(x = number_of_clones, y = total_mutations, alpha = .5), color = "black", width = 0.2) +  
+  geom_jitter(data = data_for_plot[which(data_for_plot$is_branched),], aes(x = number_of_clones, y = total_mutations, alpha = .5), color = "red", width = 0.2) + 
+  scale_fill_manual(values = cbPalette) +  
+  theme(legend.position = "none") + 
+  xlab("Number of Clones") + 
+  ylab("Number of Mutations") + 
+  annotate("text", x = 10, y = 30, label = "Kruskal-Wallis, p = 1.6e-33") + 
+  annotate("text", x = 10, y = 28, label = "black = linear evolution") + 
+  annotate("text", x = 10, y = 26, label = "red = branched evolution") +
+  coord_cartesian(ylim = c(0,30)) + 
+  ggsave("Mutations_vs_Clonality_linear_and_branched.pdf", units = "in", height = 3, width = 4, dpi=300)
 
 
 
