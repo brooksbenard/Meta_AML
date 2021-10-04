@@ -35,19 +35,10 @@ sub$Gene = as.character(sub$Gene)
 
 # make sure that the FLT3 symbols are annotated well
 for(i in 1:nrow(sub)){
-  if(sub$Gene[i] == "FLT3" & sub$variant_type[i] == "ITD"){
+  if(sub$Gene[i] == "FLT3" & sub$variant_type[i] %in% c("ITD", "INDEL")){
     sub$Gene[i] <- "FLT3-ITD"
   }
-  if(sub$Gene[i] == "FLT3" & sub$variant_type[i] == "SNV"){
-    sub$Gene[i] <- "FLT3-TKD"
-  }
-  if(sub$Gene[i] == "FLT3" & sub$variant_type[i] == "Deletion"){
-    sub$Gene[i] <- "FLT3-TKD"
-  }
-  if(sub$Gene[i] == "FLT3" & sub$variant_type[i] == "INDEL"){
-    sub$Gene[i] <- "FLT3-ITD"
-  }
-  if(sub$Gene[i] == "FLT3" & sub$variant_type[i] == "other"){
+  if(sub$Gene[i] == "FLT3" & sub$variant_type[i] %in% c("SNV", "Deletion", "other")){
     sub$Gene[i] <- "FLT3-TKD"
   }
 }
@@ -246,10 +237,10 @@ a = ggplot(data = temp_dat_final_melted, aes(y=forcats::fct_rev(reorder(Gene_1,G
   guides(    color = guide_colorbar(order = 1),
              fill = guide_legend(order = 0)) +
   theme(axis.text.x = element_text(angle = 90, vjust = .5,
-                                   size = 12, hjust = 0),
+                                   size = 10, hjust = 0),
         panel.grid.major = element_line(size = 0.5, linetype = 'solid',
                                         colour = "#f0f0f0"),
-        axis.text.y = element_text(size = 12))+
+        axis.text.y = element_text(size = 10))+
   theme(axis.text.x.top = element_text(vjust = 0.5)) +
   scale_x_discrete(position = "top") +
   xlab(label= "Gene 2") +
@@ -275,19 +266,10 @@ sub$Gene = as.character(sub$Gene)
 
 # annotate FLT3 ITD and TKD respectively
 for(i in 1:nrow(sub)){
-  if(sub$Gene[i] == "FLT3" & sub$variant_type[i] == "ITD"){
+  if(sub$Gene[i] == "FLT3" & sub$variant_type[i] %in% c("ITD", "INDEL")){
     sub$Gene[i] <- "FLT3-ITD"
   }
-  if(sub$Gene[i] == "FLT3" & sub$variant_type[i] == "SNV"){
-    sub$Gene[i] <- "FLT3-TKD"
-  }
-  if(sub$Gene[i] == "FLT3" & sub$variant_type[i] == "Deletion"){
-    sub$Gene[i] <- "FLT3-TKD"
-  }
-  if(sub$Gene[i] == "FLT3" & sub$variant_type[i] == "INDEL"){
-    sub$Gene[i] <- "FLT3-ITD"
-  }
-  if(sub$Gene[i] == "FLT3" & sub$variant_type[i] == "other"){
+  if(sub$Gene[i] == "FLT3" & sub$variant_type[i] %in% c("SNV", "Deletion", "other")){
     sub$Gene[i] <- "FLT3-TKD"
   }
 }
@@ -453,19 +435,10 @@ sub$Gene = as.character(sub$Gene)
 
 # annotate FLT3 ITD and TKD respectively
 for(i in 1:nrow(sub)){
-  if(sub$Gene[i] == "FLT3" & sub$variant_type[i] == "ITD"){
+  if(sub$Gene[i] == "FLT3" & sub$variant_type[i] %in% c("ITD", "INDEL")){
     sub$Gene[i] <- "FLT3-ITD"
   }
-  if(sub$Gene[i] == "FLT3" & sub$variant_type[i] == "SNV"){
-    sub$Gene[i] <- "FLT3-TKD"
-  }
-  if(sub$Gene[i] == "FLT3" & sub$variant_type[i] == "Deletion"){
-    sub$Gene[i] <- "FLT3-TKD"
-  }
-  if(sub$Gene[i] == "FLT3" & sub$variant_type[i] == "INDEL"){
-    sub$Gene[i] <- "FLT3-ITD"
-  }
-  if(sub$Gene[i] == "FLT3" & sub$variant_type[i] == "other"){
+  if(sub$Gene[i] == "FLT3" & sub$variant_type[i] %in% c("SNV", "Deletion", "other")){
     sub$Gene[i] <- "FLT3-TKD"
   }
 }
@@ -527,17 +500,17 @@ c = ggplot(sub, aes(y = Gene,  x = VAF_CN_corrected, fill = mutation_category, h
 
 ggsave(filename = "~/Desktop/MetaAML_results/Figure_4/vaf_distribution_order_by_time.png", dpi = 300, width = 5, height = 5, units = "in")
 
-ggarrange(a,                                                 # First row with scatter plot
-          ggarrange(c, b, ncol = 2), # Second row with box and dot plots
-          nrow = 2                                       # Labels of the scatter plot
+ggarrange(a,                                         
+          ggarrange(c, b, ncol = 2),
+          nrow = 2
 ) 
-ggsave(filename = "~/Desktop/MetaAML_results/Figure_4/pairwise_ordering_panels.png", dpi = 300, width = 9, height = 15, units = "in")
+ggsave(filename = "~/Desktop/MetaAML_results/Figure_4/pairwise_ordering_panels.pdf", dpi = 300, width = 9, height = 15, units = "in")
 
 # specifically plot the BT results
 ggarrange(c,b,
           ncol = 2, nrow = 1, widths = c(0.75, 1))
 
-ggsave(filename = "~/Desktop/MetaAML_results/Figure_4/pairwise_ordering_panels_2.png", dpi = 300, width = 7.5, height = 7.5, units = "in")
+ggsave(filename = "~/Desktop/MetaAML_results/Figure_4/pairwise_ordering_panels_2.pdf", dpi = 300, width = 7.5, height = 7.5, units = "in")
 
 
 # pairwise scatterplot function ####
@@ -547,19 +520,10 @@ final_data_matrix_2$VAF_CN_corrected = as.numeric(final_data_matrix_2$VAF_CN_cor
 
 # make sure that the FLT3 symbols are annotated properly
 for(i in 1:nrow(final_data_matrix_2)){
-  if(final_data_matrix_2$Gene[i] == "FLT3" & final_data_matrix_2$variant_type[i] == "ITD"){
+  if(final_data_matrix_2$Gene[i] == "FLT3" & final_data_matrix_2$variant_type[i] %in% c("ITD", "INDEL")){
     final_data_matrix_2$Gene[i] <- "FLT3-ITD"
   }
-  if(final_data_matrix_2$Gene[i] == "FLT3" & final_data_matrix_2$variant_type[i] == "SNV"){
-    final_data_matrix_2$Gene[i] <- "FLT3-TKD"
-  }
-  if(final_data_matrix_2$Gene[i] == "FLT3" & final_data_matrix_2$variant_type[i] == "Deletion"){
-    final_data_matrix_2$Gene[i] <- "FLT3-TKD"
-  }
-  if(final_data_matrix_2$Gene[i] == "FLT3" & final_data_matrix_2$variant_type[i] == "INDEL"){
-    final_data_matrix_2$Gene[i] <- "FLT3-ITD"
-  }
-  if(final_data_matrix_2$Gene[i] == "FLT3" & final_data_matrix_2$variant_type[i] == "other"){
+  if(final_data_matrix_2$Gene[i] == "FLT3" & final_data_matrix_2$variant_type[i] %in% c("SNV", "Deletion", "other")){
     final_data_matrix_2$Gene[i] <- "FLT3-TKD"
   }
 }
@@ -663,44 +627,16 @@ vaf_scatterplot_function(pt_subset = "All", gene_1_2 = c("NRAS", "GATA2"), save_
 
 
 # survival by pairwise ordering ####
-if (!require('ggplot2')) install.packages('ggplot2'); library('ggplot2')
-if (!require('readxl')) install.packages('readxl'); library('readxl')
-if (!require('cowplot')) install.packages('cowplot'); library('cowplot')
-if (!require('reshape2')) install.packages('reshape2'); library('reshape2')
-if (!require('plyr')) install.packages('plyr'); library('plyr')
-if (!require('dplyr')) install.packages('dplyr'); library('dplyr')
-if (!require('muhaz')) install.packages('muhaz'); library('muhaz')
-if (!require('data.table')) install.packages('data.table'); library('data.table')
-if (!require('ggpubr')) install.packages('ggpubr'); library('ggpubr')
-if (!require('muhaz')) install.packages('muhaz'); library('muhaz')
-if (!require('survival')) install.packages('survival'); library('survival')
-if (!require('survivalAnalysis')) install.packages('survivalAnalysis'); library('survivalAnalysis')
-if (!require('survMisc')) install.packages('survMisc'); library('survMisc')
-if (!require('survminer')) install.packages('survminer'); library('survminer')
-if (!require('ggsci')) install.packages('ggsci'); library('ggsci')
-if (!require('vegan')) install.packages('vegan'); library('vegan')
-if (!require('rlist')) install.packages('rlist'); library('rlist')
-
-
 load("~/Desktop/MetaAML_results/final_data_matrix_2.RData")
 final_data_matrix_sub <- subset(final_data_matrix_2, final_data_matrix_2$Subset == "de_novo" & final_data_matrix_2$Subset != "relapse" & final_data_matrix_2$mut_freq_gene >= 50)
 final_data_matrix_sub$Time_to_OS <- (final_data_matrix_sub$Time_to_OS/365)
 final_data_matrix_sub = select(final_data_matrix_sub, c("Sample", "Gene", "variant_type", "Censor", "Time_to_OS", "VAF_CN_corrected"))
 
 for(i in 1:nrow(final_data_matrix_sub)){
-  if(final_data_matrix_sub$Gene[i] == "FLT3" & final_data_matrix_sub$variant_type[i] == "ITD"){
+  if(final_data_matrix_sub$Gene[i] == "FLT3" & final_data_matrix_sub$variant_type[i] %in% c("ITD", "INDEL")){
     final_data_matrix_sub$Gene[i] <- "FLT3-ITD"
   }
-  if(final_data_matrix_sub$Gene[i] == "FLT3" & final_data_matrix_sub$variant_type[i] == "SNV"){
-    final_data_matrix_sub$Gene[i] <- "FLT3-TKD"
-  }
-  if(final_data_matrix_sub$Gene[i] == "FLT3" & final_data_matrix_sub$variant_type[i] == "Deletion"){
-    final_data_matrix_sub$Gene[i] <- "FLT3-TKD"
-  }
-  if(final_data_matrix_sub$Gene[i] == "FLT3" & final_data_matrix_sub$variant_type[i] == "INDEL"){
-    final_data_matrix_sub$Gene[i] <- "FLT3-ITD"
-  }
-  if(final_data_matrix_sub$Gene[i] == "FLT3" & final_data_matrix_sub$variant_type[i] == "other"){
+  if(final_data_matrix_sub$Gene[i] == "FLT3" & final_data_matrix_sub$variant_type[i] %in% c("SNV", "Deletion", "other")){
     final_data_matrix_sub$Gene[i] <- "FLT3-TKD"
   }
 }
@@ -986,7 +922,7 @@ for(j in 1:nrow(mut_cat)){
   n1 = nrow(subset(final_sub, order == 1))
   n3 = nrow(subset(final_sub, order == 3))
   
-  if(n1 > 15 & n3 > 15){
+  if(n1 >= 10  & n3 >= 10){
    
     n_both = n1+n3
     
@@ -1077,8 +1013,8 @@ temp_final_hr_categories_order$fdr = p.adjust(temp_final_hr_categories_order$log
 plot_list = list.clean(plot_list)
 
 plots = arrange_ggsurvplots(plot_list, print = FALSE,
-                            ncol = 4, nrow = 3)
-ggsave("~/Desktop/MetaAML_results/Figure_4/Supplimental/summary_survival_plot_grid.pdf", plots, width = 15, height = 10)
+                            ncol = 4, nrow = 4)
+ggsave("~/Desktop/MetaAML_results/Figure_4/Supplimental/summary_survival_plot_grid.pdf", plots, width = 15, height = 12)
 
 
 
@@ -1238,7 +1174,7 @@ vaf_scatterplot_function <- function(gene_1, gene_2){
                     linetype="dashed", size=.5)+
         geom_abline(intercept = -5, slope = (1), color="#969696",
                     linetype="dashed", size=.5)+
-        geom_point(shape = 1, size =  3,colour = "black") +
+        # geom_point(shape = 1, size =  3,colour = "black") +
         theme(legend.position = "none", 
               legend.title = element_blank()
         ) 

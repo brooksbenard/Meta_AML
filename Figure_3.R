@@ -31,12 +31,12 @@ dir.create("~/Desktop/MetaAML_results/Figure_3/Supplimental")
 # for all other cohorts, manual correction is performed using reported cytogenetic/karyotypic data. 
 
 #### Papaemmanuil/Gerstung ####
-download.file("https://github.com/gerstung-lab/AML-multistage/blob/master/data/AMLSG_Clinical_Anon.RData?raw=true", destfile = "~/Desktop/MetaAML_results/raw_data/AMLSG_Clinical_Anon.RData")
+# download.file("https://github.com/gerstung-lab/AML-multistage/blob/master/data/AMLSG_Clinical_Anon.RData?raw=true", destfile = "~/Desktop/MetaAML_results/raw_data/AMLSG_Clinical_Anon.RData")
 
 load("~/Desktop/MetaAML_results/raw_data/AMLSG_Clinical_Anon.RData")
 
 # 1.3.2.2 Mutation data
-download.file("https://raw.githubusercontent.com/gerstung-lab/AML-multistage/master/data/AMLSG_Genetic.txt", destfile = "~/Desktop/MetaAML_results/raw_data/AMLSG_Genetic.txt")
+# download.file("https://raw.githubusercontent.com/gerstung-lab/AML-multistage/master/data/AMLSG_Genetic.txt", destfile = "~/Desktop/MetaAML_results/raw_data/AMLSG_Genetic.txt")
 
 mutationData = read.table("~/Desktop/MetaAML_results/raw_data/AMLSG_Genetic.txt", sep="\t", header=TRUE, strip.white = TRUE) 
 mutationData$SAMPLE_NAME <- factor(as.character(mutationData$SAMPLE_NAME), levels = levels(clinicalData$PDID)) 
@@ -78,7 +78,7 @@ dataFrame = dataRaw
 dim(dataFrame)
 rownames(dataFrame) <- clinicalData$PDID
 
-download.file("https://github.com/gerstung-lab/AML-multistage/raw/master/data/AMLSG_Karyotypes.txt", destfile = "~/Desktop/MetaAML_results/raw_data/AMLSG_Karyotypes.txt")
+# download.file("https://github.com/gerstung-lab/AML-multistage/raw/master/data/AMLSG_Karyotypes.txt", destfile = "~/Desktop/MetaAML_results/raw_data/AMLSG_Karyotypes.txt")
 
 # 1.3.5 Subclonal mutations
 copyNumbers = cbind(dataList$Cytogenetics[grep(c("minus|plus|mono"), colnames(dataList$Cytogenetics))], clinicalData$gender)
@@ -117,6 +117,7 @@ mutationData$CN_status[is.na(mutationData$CN_status)] <- 2
 mutationData$VAF_CN_corrected = mutationData$VAF
 
 for(i in 1:nrow(mutationData)){
+  if(!is.na(mutationData$VAF_CN_corrected[i])){
   if(mutationData$CN_status[i] == 1){
     mutationData$VAF_CN_corrected[i] = mutationData$VAF[i]/2
   }
@@ -128,6 +129,7 @@ for(i in 1:nrow(mutationData)){
   }
   if(mutationData$CN_status[i] == 3 & mutationData$VAF[i] > 35){
     mutationData$VAF_CN_corrected[i] = mutationData$VAF[i]*0.75
+  }
   }
 }
 
@@ -241,7 +243,7 @@ vaf_sub = subset(vaf_sub, vaf_sub$Gene != "MLL")
 # append the chromosomal arm/band column to the mutation table
 cohort_aggrigate = left_join(vaf_sub, all_genes, by = "Gene")
 
-# cohort_aggrigate$Cytogenetics = tolower(cohort_aggrigate$Cytogenetics)
+cohort_aggrigate$Cytogenetics = tolower(cohort_aggrigate$Cytogenetics)
 
 # subset mutations to those where karyotyping data suggests deletions or amplifications
 cohort_aggrigate$Cytogenetics = gsub('\\s+', '', cohort_aggrigate$Cytogenetics)
@@ -265,9 +267,9 @@ for(i in 1:nrow(cohort_aggrigate)){
     
     # correct for VAF based on broad copy number gains at the gene locus  
     if(grepl(locus_gain, cohort_aggrigate$Cytogenetics[i], fixed = T) & cohort_aggrigate$VAF_male_x[i] > 35){ cohort_aggrigate$VAF_CN_corrected[i] = cohort_aggrigate$VAF_male_x[i]*0.75}
-    if(grepl(locus_gain, cohort_aggrigate$Cytogenetics[i], fixed = T) & cohort_aggrigate$VAF_male_x[i] <= 35){ cohort_aggrigate$VAF_CN_corrected[i] = cohort_aggrigate$VAF_male_x[i]*1.5}
+    if(grepl(locus_gain, cohort_aggrigate$Cytogenetics[i], fixed = T) & cohort_aggrigate$VAF_male_x[i] <= 35){ cohort_aggrigate$VAF_CN_corrected[i] = cohort_aggrigate$VAF[i]*1.5}
     # correct for VAF based on broad copy number loss at the gene locus
-    if(grepl(locus_loss, cohort_aggrigate$Cytogenetics[i], fixed = T)){ cohort_aggrigate$VAF_CN_corrected[i] = cohort_aggrigate$VAF_male_x[i]/2}
+    if(grepl(locus_loss, cohort_aggrigate$Cytogenetics[i], fixed = T)){ cohort_aggrigate$VAF_CN_corrected[i] = cohort_aggrigate$VAVAF_male_xF[i]/2}
   }
 }
 
@@ -293,6 +295,16 @@ cohort_aggrigate[,28:32] = NULL
 final_data_matrix = rbind(papaemmanuil_corrected, tcga_dat, cohort_aggrigate, fill = TRUE)
 final_data_matrix_2 = subset(final_data_matrix, final_data_matrix$Subset == "de_novo" & final_data_matrix$VAF_CN_corrected > 0)
 save(final_data_matrix_2,  file = "~/Desktop/MetaAML_results/final_data_matrix_2.RData")
+
+# delineate FLT3 mutations
+for(i in 1:nrow(final_data_matrix_2)){
+  if(final_data_matrix_2$Gene[i] == "FLT3" & final_data_matrix_2$variant_type[i] %in% c("ITD", "INDEL")){
+    final_data_matrix_2$Gene[i] <- "FLT3-ITD"
+  }
+  if(final_data_matrix_2$Gene[i] == "FLT3" & final_data_matrix_2$variant_type[i] %in% c("SNV", "Deletion", "other")){
+    final_data_matrix_2$Gene[i] <- "FLT3-TKD"
+  }
+}
 
 
 # plot the difference in VAF distribution per gene after CNA correction
@@ -337,26 +349,6 @@ ggsave(filename = "~/Desktop/MetaAML_results/Figure_3/Supplimental/all_vaf_corre
 
 
 # now plot the VAF distribution per gene colored by if the mutation is above or below the median VAF for that gene
-
-for(i in 1:nrow(final_data_matrix_2)){
-  if(final_data_matrix_2$Gene[i] == "FLT3" & final_data_matrix_2$variant_type[i] == "ITD"){
-    final_data_matrix_2$Gene[i] <- "FLT3-ITD"
-  }
-  if(final_data_matrix_2$Gene[i] == "FLT3" & final_data_matrix_2$variant_type[i] == "SNV"){
-    final_data_matrix_2$Gene[i] <- "FLT3-TKD"
-  }
-  if(final_data_matrix_2$Gene[i] == "FLT3" & final_data_matrix_2$variant_type[i] == "Deletion"){
-    final_data_matrix_2$Gene[i] <- "FLT3-TKD"
-  }
-  if(final_data_matrix_2$Gene[i] == "FLT3" & final_data_matrix_2$variant_type[i] == "INDEL"){
-    final_data_matrix_2$Gene[i] <- "FLT3-ITD"
-  }
-  if(final_data_matrix_2$Gene[i] == "FLT3" & final_data_matrix_2$variant_type[i] == "other"){
-    final_data_matrix_2$Gene[i] <- "FLT3-TKD"
-  }
-}
-
-genes = unique(final_data_matrix_2$Gene)
 genes = unique(final_data_matrix_2$Gene)
 
 final_data_matrix_2$median_threshold = NA
@@ -388,20 +380,6 @@ threshold_list_all = subset(threshold_list_all, threshold_list_all$Gene %in% mut
 
 threshold_list_all$Gene <- with(threshold_list_all, reorder(Gene, -VAF_CN_corrected, median))
 
-p = ggplot(threshold_list_all, aes(x=Gene, y=VAF_CN_corrected)) + 
-  theme_cowplot(font_size = 10) +
-  geom_boxplot(notch=F, outlier.colour = "white", color = "#374E55FF", fill = "lightgrey") +
-  geom_jitter(aes(fill = median_threshold_NA), alpha = 0.5, color = "black", shape = 21, position=position_jitter(0.15), size = 1.25) +
-  scale_fill_manual(values = c("#cb181d", "#3690c0")) +
-  labs(title = NULL) +
-  ylab(label = "VAF") +
-  xlab(label = NULL) +
-  theme(legend.position="right", axis.text.x = element_text(angle = 45, vjust = 1, hjust = 1))
-
-ggpar(p, legend.title = "")
-ggsave(filename = "~/Desktop/MetaAML_results/Figure_3/MetaAML_vaf_distribution_median_corrected.pdf", dpi = 300, width = 10, height = 2.5, units = "in")
-
-
 counts = as.data.frame(table(threshold_list_all$Gene))
 names(counts)[1] = "Gene"
 
@@ -429,8 +407,6 @@ p =  ggplot(threshold_list_all, aes(x = Gene, y = VAF_CN_corrected)) +
                  colour = "black", 
                  show.legend = FALSE) +
     theme(legend.position="right", axis.text.x = element_text(angle = 45, vjust = 1, hjust = 1))  
-# +
-#   geom_text(data = counts, aes(x = Gene, y = 105, label = Freq), size = 2, position=position_dodge(width=1.0), color = "lightgrey")
   ggpar(p, legend.title = "VAF")
 
   ggsave(filename = "~/Desktop/MetaAML_results/Figure_3/MetaAML_vaf_distribution_median_corrected_raincloud.pdf", dpi = 300, width = 10, height = 2.5, units = "in")
@@ -443,19 +419,10 @@ sub1 = subset(final_data_matrix, mut_freq_gene > 50 & final_data_matrix$Subset =
 
 # make sure that the FLT3 symbols are annotated well
 for(i in 1:nrow(sub1)){
-  if(sub1$Gene[i] == "FLT3" & sub1$variant_type[i] == "ITD"){
+  if(sub1$Gene[i] == "FLT3" & sub1$variant_type[i] %in% c("ITD", "INDEL")){
     sub1$Gene[i] <- "FLT3-ITD"
   }
-  if(sub1$Gene[i] == "FLT3" & sub1$variant_type[i] == "SNV"){
-    sub1$Gene[i] <- "FLT3-TKD"
-  }
-  if(sub1$Gene[i] == "FLT3" & sub1$variant_type[i] == "Deletion"){
-    sub1$Gene[i] <- "FLT3-TKD"
-  }
-  if(sub1$Gene[i] == "FLT3" & sub1$variant_type[i] == "INDEL"){
-    sub1$Gene[i] <- "FLT3-ITD"
-  }
-  if(sub1$Gene[i] == "FLT3" & sub1$variant_type[i] == "other"){
+  if(sub1$Gene[i] == "FLT3" & sub1$variant_type[i] %in% c("SNV", "Deletion", "other")){
     sub1$Gene[i] <- "FLT3-TKD"
   }
 }
@@ -464,13 +431,13 @@ genes = data.frame(unique(sub1$Gene))
 
 # create directories for binary comparisions
 # binary
-dir.create("~/Desktop/MetaAML_results/Data/Figures/VAF_Age/discrete")
-dir.create("~/Desktop/MetaAML_results/Data/Figures/VAF_WBC/discrete")
-dir.create("~/Desktop/MetaAML_results/Data/Figures/VAF_Platelet/discrete")
-dir.create("~/Desktop/MetaAML_results/Data/Figures/VAF_LDH/discrete")
-dir.create("~/Desktop/MetaAML_results/Data/Figures/VAF_Hemoglobin/discrete")
-dir.create("~/Desktop/MetaAML_results/Data/Figures/VAF_PB_blast_percent/discrete")
-dir.create("~/Desktop/MetaAML_results/Data/Figures/VAF_BM_blast_percent/discrete")
+dir.create("~/Desktop/MetaAML_results/Figure_3/Supplimental/VAF_Age")
+dir.create("~/Desktop/MetaAML_results/Figure_3/Supplimental/VAF_WBC")
+dir.create("~/Desktop/MetaAML_results/Figure_3/Supplimental/VAF_Platelet")
+dir.create("~/Desktop/MetaAML_results/Figure_3/Supplimental/VAF_LDH")
+dir.create("~/Desktop/MetaAML_results/Figure_3/Supplimental/VAF_Hemoglobin")
+dir.create("~/Desktop/MetaAML_results/Figure_3/Supplimental/VAF_PB_blast_percent")
+dir.create("~/Desktop/MetaAML_results/Figure_3/Supplimental/VAF_BM_blast_percent")
 
 # summary plots for each variable ####
 sub1$Gene <- as.factor(sub1$Gene)
@@ -489,9 +456,7 @@ variable_vaf_list = list()
 z = 1
 
 for(i in 1:ncol(variables)){
-  
   sub = sub1
-  
   variable = as.character(variables[1,i])
   # var_feature = as.character(variables[1,i])
   
@@ -572,32 +537,32 @@ for(i in 1:ncol(variables)){
     theme(strip.background = element_rect(colour="black", fill="white",
                                           size=1.5, linetype="solid"))
   #
-  ggsave(filename = paste("~/Desktop/MetaAML_results/Data/Figures/", "VAF_", variable,"/",variable,"_discrete.png", sep = ""), dpi = 300, width = 15, height = 15, units = "in")
+  ggsave(filename = paste("~/Desktop/MetaAML_results/Figure_3/Supplimental/", "VAF_", variable,"/",variable,"_discrete.png", sep = ""), dpi = 300, width = 15, height = 15, units = "in")
   
   
   # continuous
-  ggscatter(sub, "VAF", y = "Variable",
-            color = "black", fill = point_color, size = 5, shape = 21,
-            font.label = list(color = "black", size = 9, vjust = 0.5),
-            # title = paste(gene),
-            xlab = "VAF",
-            ylab = y_label) +
-    # xlim(0,1) +
-    # ylim(0,y_max)+
-    geom_smooth(method = "lm", color = "black", alpha = .5) +
-    theme(plot.title = element_text(hjust = 0.5, size = 18), axis.title = element_text(size = 18)) +
-    stat_cor(
-      aes(label = paste(..rr.label..)),
-      label.x.npc = 0.65,
-      label.y.npc = 1
-    ) +
-    stat_cor(
-      aes(label = paste(..p.label..)),
-      label.x.npc = 0.65,
-      label.y.npc = 0.9
-    ) +
-    # geom_text()
-    annotate("text", label = paste("n =", n), x = 0.75, y = n_label, size = 4, colour = "black")
+  # ggscatter(sub, "VAF", y = "Variable",
+  #           color = "black", fill = point_color, size = 5, shape = 21,
+  #           font.label = list(color = "black", size = 9, vjust = 0.5),
+  #           # title = paste(gene),
+  #           xlab = "VAF",
+  #           ylab = y_label) +
+  #   # xlim(0,1) +
+  #   # ylim(0,y_max)+
+  #   geom_smooth(method = "lm", color = "black", alpha = .5) +
+  #   theme(plot.title = element_text(hjust = 0.5, size = 18), axis.title = element_text(size = 18)) +
+  #   stat_cor(
+  #     aes(label = paste(..rr.label..)),
+  #     label.x.npc = 0.65,
+  #     label.y.npc = 1
+  #   ) +
+  #   stat_cor(
+  #     aes(label = paste(..p.label..)),
+  #     label.x.npc = 0.65,
+  #     label.y.npc = 0.9
+  #   ) +
+  #   # geom_text()
+  #   annotate("text", label = paste("n =", n), x = 0.75, y = n_label, size = 4, colour = "black")
   
   # p + facet_wrap(. ~ Gene, ncol = 6) +
   #   theme(strip.background = element_rect(colour="black", fill="white", 
@@ -627,9 +592,7 @@ for(i in 1:ncol(variables)){
     sub_mut$LDH <- as.numeric(sub_mut$LDH)
     sub_mut$BM_blast_percent <- as.numeric(sub_mut$BM_blast_percent)
     sub_mut$PB_blast_percent <- as.numeric(sub_mut$PB_blast_percent)
-    
-    # sub_mut <- subset(sub_mut, sub_mut$Sample != "PD8204a")
-    
+  
     n <- as.numeric(nrow(sub_mut))
     print(n)
     
@@ -647,7 +610,6 @@ for(i in 1:ncol(variables)){
     n_n1 = as.numeric(length(which(sub_mut$median_vaf == "Over")))
     n_n2 = as.numeric(length(which(sub_mut$median_vaf == "Under")))
     effect_size_ci = psych::cohen.d.ci(d = effect_size, n = n, n1 = n_n1, n2 = n_n2)
-    
     
     variable_vaf_t <- data.frame(matrix(NA, nrow = 1, ncol = 6))
     names(variable_vaf_t) <- c("Variable", "Mutated_Gene", "effect_size", "CI_lower", "CI_upper", "p_value")
@@ -684,7 +646,7 @@ for(i in 1:ncol(variables)){
         axis.text.x = element_blank(),
         axis.ticks.x.bottom  = element_blank())
     
-    ggsave(filename = paste("~/Desktop/MetaAML_results/Data/Figures/", "VAF_", variable,"/discrete/",variable, "_vs_", gene,"_VAF.png", sep = ""), dpi = 300, width = 5, height = 5, units = "in") 
+    ggsave(filename = paste("~/Desktop/MetaAML_results/Figure_3/Supplimental/", "VAF_", variable,"/",variable, "_vs_", gene,"_VAF.png", sep = ""), dpi = 300, width = 5, height = 5, units = "in") 
     
   }   
 }
@@ -756,7 +718,7 @@ p + facet_grid(. ~ Variable) +
   theme(strip.background = element_rect(colour="black", fill= "white",
                                         size=1.5, linetype="solid"))
 
-ggsave(filename = "~/Desktop/MetaAML_results/Figure_3/VAF_clinical_features_discrete.png", dpi = 300, width = 15, height = 6, units = "in") 
+ggsave(filename = "~/Desktop/MetaAML_results/Figure_3/VAF_clinical_features_discrete.pdf", dpi = 300, width = 15, height = 6, units = "in") 
 
 write.csv(var2_adj_list, "~/Desktop/MetaAML_results/Figure_3/VAF_discrete_clinical_features.csv")
 
@@ -774,20 +736,11 @@ final_data_matrix_2_sub$Time_to_OS <- (final_data_matrix_2_sub$Time_to_OS/365)
 final_data_matrix_2_sub$Gene = as.character(final_data_matrix_2_sub$Gene)
 
 for(i in 1:nrow(final_data_matrix_2_sub)){
-  if(final_data_matrix_2_sub$Gene[i] == "FLT3" & final_data_matrix_2_sub$variant_type[i] == "SNV"){
+  if(final_data_matrix_2_sub$Gene[i] == "FLT3" & final_data_matrix_2_sub$variant_type[i] %in% c("SNV", "Deletion", "other")){
     final_data_matrix_2_sub$Gene[i] = "FLT3-TKD"
   }
-  if(final_data_matrix_2_sub$Gene[i] == "FLT3" & final_data_matrix_2_sub$variant_type[i] == "ITD"){
+  if(final_data_matrix_2_sub$Gene[i] == "FLT3" & final_data_matrix_2_sub$variant_type[i] %in% c("ITD", "INDEL")){
     final_data_matrix_2_sub$Gene[i] = "FLT3-ITD"
-  }
-  if(final_data_matrix_2_sub$Gene[i] == "FLT3" & final_data_matrix_2_sub$variant_type[i] == "Deletion"){
-    final_data_matrix_2_sub$Gene[i] = "FLT3-TKD"
-  }
-  if(final_data_matrix_2_sub$Gene[i] == "FLT3" & final_data_matrix_2_sub$variant_type[i] == "INDEL"){
-    final_data_matrix_2_sub$Gene[i] = "FLT3-ITD"
-  }
-  if(final_data_matrix_2_sub$Gene[i] == "FLT3" & final_data_matrix_2_sub$variant_type[i] == "other"){
-    final_data_matrix_2_sub$Gene[i] = "FLT3-TKD"
   }
 }
 
@@ -1009,21 +962,6 @@ temp_final_hr$Upper_CI = as.numeric(temp_final_hr$Upper_CI)
 
 temp_final_hr$Gene <- factor(temp_final_hr$Gene, levels = temp_final_hr$Gene[order(temp_final_hr$HR)])
 
-ggplot(temp_final_hr, aes(x = reorder(Gene, -HR), y = HR, label = temp_final_hr$p_q_text)) +
-  geom_hline(yintercept=1, linetype="dashed", color = "black") +
-  geom_text(aes(Gene, Upper_CI), hjust = 0, nudge_y = 0.5) +
-  geom_pointrange(size = 0.75, stat = "identity", shape = 19,
-                  # fill = "white",
-                  aes(x = Gene, ymin = Lower_CI, ymax = Upper_CI, y = HR, color = sig_color)) +
-  scale_color_manual(values = c("0" = "#737373", "1" = "#1b7837", "2" = "#762a83"))+
-  ylab("Hazard Ratio\n(high VAF vs. low VAF)")+
-  # ylim(0,11.5)+
-  theme_cowplot() +
-  theme(legend.position = "none",
-        axis.title.y=element_blank()) +
-  coord_flip()
-
-
 ggplot(temp_final_hr, aes(x = reorder(Gene, -HR), y = HR, label = p_q_text)) +
   geom_hline(yintercept=1, linetype="dashed", color = "black") +
   geom_text(aes(Gene, Upper_CI), hjust = 0, nudge_y = 0.5) +
@@ -1035,10 +973,9 @@ ggplot(temp_final_hr, aes(x = reorder(Gene, -HR), y = HR, label = p_q_text)) +
   scale_size_area(max_size = 5,breaks=c(25,50,100,200,300)) +
   theme(legend.position = c(0.6, .2),
         axis.title.y=element_blank()) +
-  coord_flip() +
+  coord_flip(ylim = c(0,22)) +
   guides(color = FALSE,
          size =  guide_legend(override.aes=list(colour="lightgrey"), title = "n. patients over\nVAF threshold"))
-
 
 ggsave(filename = "~/Desktop/MetaAML_results/Figure_3/gene_vaf_optimal_vaf_thresholds_hr_forest_plot_de_novo.pdf", dpi = 300, width = 5, height = 6, units = "in")
 
@@ -1075,8 +1012,6 @@ p =  ggplot(hr_comparision, aes(x=HR, y = VAF_HR, color = sig)) +
         theme_cowplot() +
   geom_segment(aes(x = 0, xend =4, y = 1, yend = 1),
                colour = "lightgrey",lty = "dashed") +
-  # geom_errorbar(aes(ymin = VAF_lower_95, ymax = VAF_upper_95), alpha = .15) +
-  # geom_errorbarh(aes(xmin = gene_lower_95, xmax = gene_upper_95), alpha = .15) +
         geom_point(aes(size = VAF_threshold), alpha = .9) +
   geom_point(aes(size = VAF_threshold), shape = 1, colour = "black") +
         scale_colour_manual(values = c("q < 0.1"= "#b2182b","q > 0.1"="grey")) + 
@@ -1101,12 +1036,13 @@ gene_vaf_effect_size = read.csv("~/Desktop/MetaAML_results/Figure_3/VAF_discrete
 gene_effect_size = gene_effect_size %>% 
   select(Variable, Gene, effect_size, n_mut, q_val) %>%
   subset(Variable %in% c("WBC", "PB_blast_percent"))
+gene_effect_size$Variable = gsub("PB_blast_percent", "PB blast %", gene_effect_size$Variable)
 
 names(gene_effect_size) = c("Variable", "Gene", "effect_size", "n_mut", "q_value")
 
 gene_vaf_effect_size = gene_vaf_effect_size %>% 
   select(Variable, Mutated_Gene, effect_size, q_val) %>%
-  subset(Variable %in% c("WBC", "PB_blast_percent"))
+  subset(Variable %in% c("WBC", "PB blast %"))
 
 names(gene_vaf_effect_size) = c("Variable", "Gene", "effect_size_vaf", "q_value_vaf")
 
@@ -1118,7 +1054,7 @@ for(i in 1:nrow(es_comparision)){
   if(es_comparision$q_value_vaf[i] < 0.1 & es_comparision$Variable[i] == "WBC"){
     es_comparision$sig_color[i] = "WBC q < 0.1"
   }
-  if(es_comparision$q_value_vaf[i] < 0.1 & es_comparision$Variable[i] == "PB_blast_percent"){
+  if(es_comparision$q_value_vaf[i] < 0.1 & es_comparision$Variable[i] == "PB blast %"){
     es_comparision$sig_color[i] = "PB q < 0.1"
   }
 }
@@ -1131,8 +1067,6 @@ for(i in 1:nrow(es_comparision)){
     es_comparision$label[i] = es_comparision$Gene[i]
   }
 }
-
-es_comparision$Variable = gsub("PB_blast_percent", "PB blast %", es_comparision$Variable)
 
 es_comparision$Variable = factor(es_comparision$Variable, levels = c("WBC", "PB blast %"))
 
@@ -1161,105 +1095,6 @@ write_csv(es_comparision, "~/Desktop/MetaAML_results/Figure_3/WBC_ES_vs_VAF_ES.c
 
 
 # Supplimental ####
-
-# VAf distribution ####
-load("~/Desktop/MetaAML_results/final_data_matrix.RData")
-
-vaf_sub = subset(final_data_matrix, final_data_matrix$Subset == "de_novo")
-vaf_sub = subset(vaf_sub, vaf_sub$mut_freq_gene >= 50)
-vaf_sub = subset(vaf_sub, vaf_sub$Gene != "MLL")
-
-# make sure that the FLT3 symbols are annotated properly
-for(i in 1:nrow(vaf_sub)){
-  if(vaf_sub$Gene[i] == "FLT3" & vaf_sub$variant_type[i] == "ITD"){
-    vaf_sub$Gene[i] <- "FLT3-ITD"
-  }
-  if(vaf_sub$Gene[i] == "FLT3" & vaf_sub$variant_type[i] == "SNV"){
-    vaf_sub$Gene[i] <- "FLT3-TKD"
-  }
-  if(vaf_sub$Gene[i] == "FLT3" & vaf_sub$variant_type[i] == "Deletion"){
-    vaf_sub$Gene[i] <- "FLT3-TKD"
-  }
-  if(vaf_sub$Gene[i] == "FLT3" & vaf_sub$variant_type[i] == "INDEL"){
-    vaf_sub$Gene[i] <- "FLT3-ITD"
-  }
-  if(vaf_sub$Gene[i] == "FLT3" & vaf_sub$variant_type[i] == "other"){
-    vaf_sub$Gene[i] <- "FLT3-TKD"
-  }
-}
-
-vaf_sub = select(vaf_sub, Sample, Gene, VAF_male_x, variant_type)
-
-vaf_sub$threshold = ifelse(vaf_sub$VAF_male_x >= 30 , "High", "Low")
-
-vaf_sub = subset(vaf_sub, vaf_sub$threshold == "High" | vaf_sub$threshold == "Low")
-
-vaf_sub$VAF_male_x=as.numeric(vaf_sub$VAF_male_x)
-vaf_sub$Gene = as.character(vaf_sub$Gene)
-
-vaf_sub$Gene <- with(vaf_sub, reorder(Gene, -VAF_male_x, median))
-
-p = ggplot(vaf_sub, aes(x=Gene, y=VAF_male_x)) + 
-  geom_boxplot(notch=F, outlier.colour = "white", color = "#374E55FF", fill = "lightgrey") +
-  geom_jitter(aes(fill = threshold), color = "black", shape = 21, position=position_jitter(0.2), size = 1.5) +
-  scale_fill_manual(values = c("#cb181d", "#3690c0")) +
-  geom_hline(yintercept = 30, color = "#b2182b", linetype="dashed") +
-  theme_cowplot(font_size = 7.5) +
-  labs(title = NULL) +
-  ylab(label = "VAF") +
-  xlab(label = NULL) +
-  theme(legend.position="right") +
-  theme(axis.text.x = element_text(angle = 45, vjust = 1, 
-                                   size = 7.5, hjust = 1),
-        axis.text.y = element_text(size = 7.5))
-
-ggpar(p, legend.title = "")
-ggsave(filename = "~/Desktop/MetaAML_results/Figure_3/Supplimental/MetaAML_vaf_distribution.pdf", dpi = 300, width = 10, height = 3, units = "in")
-
-
-# now plot the VAF distributino per gene colored by whethere the mutation is above or below the mdeian VAF for that gene
-genes = unique(vaf_sub$Gene)
-
-vaf_sub$median_threshold = NA
-
-threshold_list = list()
-z = 1
-
-for(i in 1:length(genes)){
-  
-  # select the gene of interest
-  sub = subset(vaf_sub, Gene == genes[i])
-  
-  # calculate the median vaf based on the X-corrected VAF
-  med_vaf = as.numeric(median(sub$VAF_male_x))
-  
-  sub$median_threshold = ifelse(sub$VAF_male_x >= med_vaf, "High", "Low")
-  
-  threshold_list[[i]] = data.frame(sub)
-  
-}
-
-threshold_list_all = do.call(rbind, threshold_list)
-rm(threshold_list)
-
-threshold_list_all$Gene <- with(threshold_list_all, reorder(Gene, -VAF_male_x, median))
-
-p = ggplot(threshold_list_all, aes(x=Gene, y=VAF_male_x)) + 
-  geom_boxplot(notch=F, outlier.colour = "white", color = "#374E55FF", fill = "lightgrey") +
-  geom_jitter(aes(fill = median_threshold), color = "black", shape = 21, position=position_jitter(0.2), size = 1.5) +
-  scale_fill_manual(values = c("#cb181d", "#3690c0")) +
-  theme_cowplot(font_size = 7.5) +
-  labs(title = NULL) +
-  ylab(label = "VAF") +
-  xlab(label = NULL) +
-  theme(legend.position="right", legend.text = element_text(size = 7.5), axis.text.x = element_text(angle = 45, vjust = 1, 
-                                                                                                    size = 7.5, hjust = 1),
-        axis.text.y = element_text(size = 7.5))
-
-ggpar(p, legend.title = "")
-ggsave(filename = "~/Desktop/MetaAML_results/Figure_3/Supplimental/MetaAML_vaf_distribution_median.pdf", dpi = 300, width = 10, height = 2.5, units = "in")
-
-
 
 # static vaf cutoff ####
 dir.create("~/Desktop/MetaAML_results/Figure_3/Supplimental/Median_VAF")
@@ -1629,7 +1464,7 @@ ggplot(temp_final_median, aes(x = reorder(Gene, -HR), y = HR, label = temp_final
   scale_color_manual(values = c("0" = "darkgrey", "1" = "#762a83"))+
   ylab("Hazard Ratio")+
   theme_cowplot() +
-  ylim(0,18)+
+  # ylim(0,18)+
   theme(legend.position = "none",
         axis.title.y=element_blank()) +
   coord_flip()

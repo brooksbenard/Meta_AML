@@ -9,7 +9,10 @@
 # Load packages ####
 # ================ #
 # Package names
-packages <- c("ggplot2", "dplyr", "cometExactTest", "discover", "stringr", "maditr", "reshape2", "data.table", "epitools", "corrplot", "plyr", "muhaz", "reshape", "survival", "survivalAnalysis", "survMisc", "survminer", "ggsci", "vegan", "ggrepel", "ggforce", "rstatix", "effsize", "psych")
+packages <- c("ggplot2", "dplyr", "cometExactTest", "stringr", "maditr", "reshape2", "data.table", "epitools", "corrplot", "plyr", "muhaz", "reshape", "survival", "survivalAnalysis", "survMisc", "survminer", "ggsci", "vegan", "ggrepel", "ggforce", "rstatix", "effsize", "psych", "devtools", "ggrepel", "cowplot", "RColorBrewer", "readr")
+
+# devtools::install_github("thomasp85/ggforce")
+library("ggforce")
 
 # Install packages not yet installed
 installed_packages <- packages %in% rownames(installed.packages())
@@ -32,51 +35,15 @@ sub = subset(final_data_matrix, mut_freq_gene > 50 & final_data_matrix$Subset ==
 
 # make sure that the FLT3 symbols are annotated well
 for(i in 1:nrow(sub)){
-  if(sub$Gene[i] == "FLT3" & sub$variant_type[i] == "ITD"){
+  if(sub$Gene[i] == "FLT3" & sub$variant_type[i] %in% c("ITD", "INDEL")){
     sub$Gene[i] <- "FLT3-ITD"
   }
-  if(sub$Gene[i] == "FLT3" & sub$variant_type[i] == "SNV"){
-    sub$Gene[i] <- "FLT3-TKD"
-  }
-  if(sub$Gene[i] == "FLT3" & sub$variant_type[i] == "Deletion"){
-    sub$Gene[i] <- "FLT3-TKD"
-  }
-  if(sub$Gene[i] == "FLT3" & sub$variant_type[i] == "INDEL"){
-    sub$Gene[i] <- "FLT3-ITD"
-  }
-  if(sub$Gene[i] == "FLT3" & sub$variant_type[i] == "other"){
+  if(sub$Gene[i] == "FLT3" & sub$variant_type[i] %in% c("SNV", "Deletion", "other")){
     sub$Gene[i] <- "FLT3-TKD"
   }
 }
 
 genes = data.frame(unique(sub$Gene))
-
-# create directories for linear regression and binary comparisions
-dir.create("~/Desktop/MetaAML_results/Data/Figures/VAF_Age")
-dir.create("~/Desktop/MetaAML_results/Data/Figures/VAF_WBC")
-dir.create("~/Desktop/MetaAML_results/Data/Figures/VAF_Platelet")
-dir.create("~/Desktop/MetaAML_results/Data/Figures/VAF_LDH")
-dir.create("~/Desktop/MetaAML_results/Data/Figures/VAF_Hemoglobin")
-dir.create("~/Desktop/MetaAML_results/Data/Figures/VAF_PB_blast_percent")
-dir.create("~/Desktop/MetaAML_results/Data/Figures/VAF_BM_blast_percent")
-
-# regression
-dir.create("~/Desktop/MetaAML_results/Data/Figures/VAF_Age/continuous")
-dir.create("~/Desktop/MetaAML_results/Data/Figures/VAF_WBC/continuous")
-dir.create("~/Desktop/MetaAML_results/Data/Figures/VAF_Platelet/continuous")
-dir.create("~/Desktop/MetaAML_results/Data/Figures/VAF_LDH/continuous")
-dir.create("~/Desktop/MetaAML_results/Data/Figures/VAF_Hemoglobin/continuous")
-dir.create("~/Desktop/MetaAML_results/Data/Figures/VAF_PB_blast_percent/continuous")
-dir.create("~/Desktop/MetaAML_results/Data/Figures/VAF_BM_blast_percent/continuous")
-
-# binary
-dir.create("~/Desktop/MetaAML_results/Data/Figures/VAF_Age/discrete")
-dir.create("~/Desktop/MetaAML_results/Data/Figures/VAF_WBC/discrete")
-dir.create("~/Desktop/MetaAML_results/Data/Figures/VAF_Platelet/discrete")
-dir.create("~/Desktop/MetaAML_results/Data/Figures/VAF_LDH/discrete")
-dir.create("~/Desktop/MetaAML_results/Data/Figures/VAF_Hemoglobin/discrete")
-dir.create("~/Desktop/MetaAML_results/Data/Figures/VAF_PB_blast_percent/discrete")
-dir.create("~/Desktop/MetaAML_results/Data/Figures/VAF_BM_blast_percent/discrete")
 
 # summary plots for each variable ####
 sub$VAF <- as.numeric(sub$VAF)
@@ -95,92 +62,101 @@ variables = c("Age", "Platelet", "Hemoglobin", "WBC", "LDH", "BM_blast_percent",
 colors = c("#bdbdbd",  "#fb6a4a", "#fe9929", "#d4b9da", "#238443", "#e6ab02", "#8dd3c7")
 
 # age
-ggplot(sub, aes(x=reorder(Gene, -Age, median, na.rm = T), y=Age)) +
-  geom_boxplot(fill="#bdbdbd", color="black") +
-  theme_cowplot(font_size = 15) +
-  theme(axis.text.x = element_text(angle = 45, vjust = .75, 
-                                   size = 10, hjust = .5)) +
-  xlab(label = NULL) +
-  ylab("Age") +
-  geom_hline(yintercept=mean(sub$Age, na.rm = T), linetype="dashed", color = "#99000d")
+age2 = ggplot(sub, aes(x=reorder(Gene, -Age, median, na.rm = T), y=Age)) +
+          geom_boxplot(fill="#bdbdbd", color="black") +
+          theme_cowplot(font_size = 15) +
+          theme(axis.text.x = element_text(angle = 45, vjust = .75, 
+                                           size = 10, hjust = .5)) +
+          xlab(label = NULL) +
+          ylab("Age") +
+          geom_hline(yintercept=mean(sub$Age, na.rm = T), linetype="dashed", color = "#99000d")
 
 ggsave(filename = "~/Desktop/MetaAML_results/Figure_2/Supplimental/Age_vs_gene.png", dpi = 300, width = 10, height = 2.5, units = "in") 
 
 # Platelet
-ggplot(sub, aes(x=reorder(Gene, -Platelet, median, na.rm = T), y=Platelet)) +
-  geom_boxplot(fill="#fb6a4a", color="black") +
-  theme_cowplot(font_size = 15) +
-  theme(axis.text.x = element_text(angle = 45, vjust = .75, 
-                                   size = 10, hjust = .5)) +
-  xlab(label = NULL) +
-  ylab("Platelet (1e3/μL)") +
-  geom_hline(yintercept=median(sub$Platelet, na.rm = T), linetype="dashed", color = "#99000d")+
-  facet_zoom(ylim = c(0, 200))
+platelet_2 = ggplot(sub, aes(x=reorder(Gene, -Platelet, median, na.rm = T), y=Platelet)) +
+                geom_boxplot(fill="#fb6a4a", color="black") +
+                theme_cowplot(font_size = 15) +
+                theme(axis.text.x = element_text(angle = 45, vjust = .75, 
+                                                 size = 10, hjust = .5)) +
+                xlab(label = NULL) +
+                ylab("Platelet (1e3/μL)") +
+                geom_hline(yintercept=median(sub$Platelet, na.rm = T), linetype="dashed", color = "#99000d")+
+                facet_zoom(ylim = c(0, 200))
 
 ggsave(filename = "~/Desktop/MetaAML_results/Figure_2/Supplimental/Platelet_vs_gene.png", dpi = 300, width = 10, height = 2.5, units = "in") 
 
 # Hemoglobin
-ggplot(sub, aes(x=reorder(Gene, -Hemoglobin, median, na.rm = T), y=Hemoglobin)) +
-  geom_boxplot(fill="#fe9929", color="black") +
-  theme_cowplot(font_size = 15) +
-  theme(axis.text.x = element_text(angle = 45, vjust = .75, 
-                                   size = 10, hjust = .5)) +
-  xlab(label = NULL) +
-  ylab("Hemoglobin (g/dL)") +
-  geom_hline(yintercept=mean(sub$Hemoglobin, na.rm = T), linetype="dashed", color = "#99000d") +
-  facet_zoom(ylim = c(0, 18))
+heme_2 = ggplot(sub, aes(x=reorder(Gene, -Hemoglobin, median, na.rm = T), y=Hemoglobin)) +
+              geom_boxplot(fill="#fe9929", color="black") +
+              theme_cowplot(font_size = 15) +
+              theme(axis.text.x = element_text(angle = 45, vjust = .75, 
+                                               size = 10, hjust = .5)) +
+              xlab(label = NULL) +
+              ylab("Hemoglobin (g/dL)") +
+              geom_hline(yintercept=mean(sub$Hemoglobin, na.rm = T), linetype="dashed", color = "#99000d") 
 
 ggsave(filename = "~/Desktop/MetaAML_results/Figure_2/Supplimental/Hemoglobin_vs_gene.png", dpi = 300, width = 10, height = 2.5, units = "in") 
 
 # WBC
-ggplot(sub, aes(x=reorder(Gene, -WBC, median, na.rm = T), y=WBC)) +
-  geom_boxplot(fill="#d4b9da", color="black") +
-  theme_cowplot(font_size = 15) +
-  theme(axis.text.x = element_text(angle = 45, vjust = .75, 
-                                   size = 10, hjust = .5)) +
-  xlab(label = NULL) +
-  ylab("WBC") +
-  geom_hline(yintercept=mean(sub$WBC, na.rm = T), linetype="dashed", color = "#99000d")+
-  facet_zoom(ylim = c(0, 125))
+wbc2 = ggplot(sub, aes(x=reorder(Gene, -WBC, median, na.rm = T), y=WBC)) +
+            geom_boxplot(fill="#d4b9da", color="black") +
+            theme_cowplot(font_size = 15) +
+            theme(axis.text.x = element_text(angle = 45, vjust = .75, 
+                                             size = 10, hjust = .5)) +
+            xlab(label = NULL) +
+            ylab("WBC") +
+            geom_hline(yintercept=mean(sub$WBC, na.rm = T), linetype="dashed", color = "#99000d")+
+            facet_zoom(ylim = c(0, 125))
 
 ggsave(filename = "~/Desktop/MetaAML_results/Figure_2/Supplimental/WBC_vs_gene.png", dpi = 300, width = 10, height = 2.5, units = "in") 
 
 # LDH
-ggplot(sub, aes(x=reorder(Gene, -LDH, median, na.rm = T), y=LDH)) +
-  geom_boxplot(fill="#238443", color="black") +
-  theme_cowplot(font_size = 15) +
-  theme(axis.text.x = element_text(angle = 45, vjust = .75, 
-                                   size = 10, hjust = .5)) +
-  xlab(label = NULL) +
-  ylab("LDH") +
-  geom_hline(yintercept=mean(sub$LDH, na.rm = T), linetype="dashed", color = "#99000d")+
-  facet_zoom(ylim = c(0, 1500))
+ldh2 = ggplot(sub, aes(x=reorder(Gene, -LDH, median, na.rm = T), y=LDH)) +
+            geom_boxplot(fill="#238443", color="black") +
+            theme_cowplot(font_size = 15) +
+            theme(axis.text.x = element_text(angle = 45, vjust = .75, 
+                                             size = 10, hjust = .5)) +
+            xlab(label = NULL) +
+            ylab("LDH") +
+            geom_hline(yintercept=mean(sub$LDH, na.rm = T), linetype="dashed", color = "#99000d")+
+            facet_zoom(ylim = c(0, 1500))
 
 ggsave(filename = "~/Desktop/MetaAML_results/Figure_2/Supplimental/LDH_vs_gene.png", dpi = 300, width = 10, height = 2.5, units = "in") 
 
 # BM_blast_percent
-ggplot(sub, aes(x=reorder(Gene, -BM_blast_percent, median, na.rm = T), y=BM_blast_percent)) +
-  geom_boxplot(fill="#e6ab02", color="black") +
-  theme_cowplot(font_size = 15) +
-  theme(axis.text.x = element_text(angle = 45, vjust = .75, 
-                                   size = 10, hjust = .5)) +
-  xlab(label = NULL) +
-  ylab("BM Blast %") +
-  geom_hline(yintercept=mean(sub$BM_blast_percent, na.rm = T), linetype="dashed", color = "#99000d") 
+bm_blast = ggplot(sub, aes(x=reorder(Gene, -BM_blast_percent, median, na.rm = T), y=BM_blast_percent)) +
+                geom_boxplot(fill="#e6ab02", color="black") +
+                theme_cowplot(font_size = 15) +
+                theme(axis.text.x = element_text(angle = 45, vjust = .75, 
+                                                 size = 10, hjust = .5)) +
+                xlab(label = NULL) +
+                ylab("BM Blast %") +
+                geom_hline(yintercept=mean(sub$BM_blast_percent, na.rm = T), linetype="dashed", color = "#99000d") 
 
 ggsave(filename = "~/Desktop/MetaAML_results/Figure_2/Supplimental/BM_blast_percent_vs_gene.png", dpi = 300, width = 10, height = 2.5, units = "in") 
 
 # PB_blast_percent
-ggplot(sub, aes(x=reorder(Gene, -PB_blast_percent, median, na.rm = T), y=PB_blast_percent)) +
-  geom_boxplot(fill="#8dd3c7", color="black") +
-  theme_cowplot(font_size = 15) +
-  theme(axis.text.x = element_text(angle = 45, vjust = .75, 
-                                   size = 10, hjust = .5)) +
-  xlab(label = NULL) +
-  ylab("PB Blast %") +
-  geom_hline(yintercept=mean(sub$PB_blast_percent, na.rm = T), linetype="dashed", color = "#99000d")
+pb_blast = ggplot(sub, aes(x=reorder(Gene, -PB_blast_percent, median, na.rm = T), y=PB_blast_percent)) +
+                  geom_boxplot(fill="#8dd3c7", color="black") +
+                  theme_cowplot(font_size = 15) +
+                  theme(axis.text.x = element_text(angle = 45, vjust = .75, 
+                                                   size = 10, hjust = .5)) +
+                  xlab(label = NULL) +
+                  ylab("PB Blast %") +
+                  geom_hline(yintercept=mean(sub$PB_blast_percent, na.rm = T), linetype="dashed", color = "#99000d")
 
 ggsave(filename = "~/Desktop/MetaAML_results/Figure_2/Supplimental/PB_blast_percent_vs_gene.png", dpi = 300, width = 10, height = 2.5, units = "in") 
+
+
+# put all of the plots into a panel
+ggarrange(wbc2, heme_2, platelet_2, ldh2, bm_blast, pb_blast, age2,
+          nrow = 7,
+          ncol = 1,
+          align = "hv"
+)
+
+ggsave(filename = "~/Desktop/MetaAML_results/Figure_2/Supplimental/all_variables_panel.pdf", dpi = 300, width = 10, height = 17.5, units = "in")
 
 
 
@@ -227,8 +203,7 @@ for(i in 1:length(variables)){
       effect_size = cohens_d(Variable ~ genotype, data = temp)$effsize
       n_n1 = as.numeric(length(which(temp$genotype == "Double")))
       n_n2 = as.numeric(length(which(temp$genotype == "Other")))
-      effect_size_ci = cohen.d.ci(d = effect_size, n = n, n1 = n_n1, n2 = n_n2)
-      
+      effect_size_ci = psych::cohen.d.ci(d = effect_size, n = n, n1 = n_n1, n2 = n_n2)
       
       variable_stats <- data.frame(matrix(NA, nrow = 1, ncol = 8))
       names(variable_stats) <- c("Variable", "Gene_1", "Gene_2", "effect_size", "CI_lower", "CI_upper", "p_value", "n_double")
@@ -303,7 +278,7 @@ p = ggplot(gene_pairs_list_final_adj, aes(x=effect_size, y=-log10(p_value), colo
   geom_hline(yintercept = 3.563053,  linetype = "dashed", color = "lightgrey") +
   geom_point(alpha = 0.75) +
   xlim(-1,2) +
-  geom_point(shape = 21, color = "black", alpha = 0.25)  +
+  # geom_point(shape = 21, color = "black", alpha = 0.25)  +
   geom_label_repel(aes(label=point_label), size = 2, force = 75, max.overlaps = 5) +
   scale_size_area(max_size = 10,breaks=c(10,25,50,100,250,350)) +
   scale_colour_manual(values = c("sig_pos_ES"="#b35806", "sig_neg_ES" = "#542788", "not_sig_ES"="lightgrey")) +
@@ -312,14 +287,14 @@ p = ggplot(gene_pairs_list_final_adj, aes(x=effect_size, y=-log10(p_value), colo
   xlab(label= "Effect Size (co-mut vs. others)") +
   theme(plot.title = element_text(color="black", size=20)) 
 
-g = guide_legend(override.aes=list(colour="lightgrey"), "n. co-mut")
+g = guide_legend(override.aes=list(size="lightgrey"), title = "n. co-mut")
 
-p = p + facet_wrap(. ~ Variable, ncol = 7) + guides(size = g, color = FALSE) +
+p = p + facet_wrap(. ~ Variable, ncol = 7) + ggplot2::guides(color = "none", size = g) + 
   theme(
     strip.background = element_rect(colour="black", fill="white", 
-                                    size=1.5, linetype="solid")) 
+                                    size=1.5, linetype="solid"))
 
-ggsave(plot = p, filename = "~/Desktop/MetaAML_results/Figure_2/Pairwise_genotype_clinical_correlations.png", dpi = 300, width = 15, height = 5, units = "in")
+ggsave(plot = p, filename = "~/Desktop/MetaAML_results/Figure_2/Pairwise_genotype_clinical_correlations.pdf", dpi = 300, width = 15, height = 5, units = "in")
 
 
 
@@ -329,17 +304,11 @@ final_data_matrix_2_sub <- subset(final_data_matrix, Subset == "de_novo")
 
 # make sure that the FLT3 symbols are the same
 for(i in 1:nrow(final_data_matrix_2_sub)){
-  if(final_data_matrix_2_sub$Gene[i] == "FLT3" & final_data_matrix_2_sub$variant_type[i] == "ITD"){
+  if(final_data_matrix_2_sub$Gene[i] == "FLT3" & final_data_matrix_2_sub$variant_type[i] %in% c("ITD", "Deletion")){
     final_data_matrix_2_sub$Gene[i] <- "FLT3-ITD"
   }
-  if(final_data_matrix_2_sub$Gene[i] == "FLT3" & final_data_matrix_2_sub$variant_type[i] == "SNV"){
+  if(final_data_matrix_2_sub$Gene[i] == "FLT3" & final_data_matrix_2_sub$variant_type[i] %in% c("SNV", "INDEL", "other")){
     final_data_matrix_2_sub$Gene[i] <- "FLT3-TKD"
-  }
-  if(final_data_matrix_2_sub$Gene[i] == "FLT3" & final_data_matrix_2_sub$variant_type[i] == "Deletion"){
-    final_data_matrix_2_sub$Gene[i] <- "FLT3-TKD"
-  }
-  if(final_data_matrix_2_sub$Gene[i] == "FLT3" & final_data_matrix_2_sub$variant_type[i] == "INDEL"){
-    final_data_matrix_2_sub$Gene[i] <- "FLT3-ITD"
   }
 }
 
@@ -356,7 +325,6 @@ final_data_matrix_2_sub <- final_data_matrix_2_sub %>% left_join(pt_gene, by=c("
 
 
 temp1 <- subset(final_data_matrix_2_sub, final_data_matrix_2_sub$mut_freq_gene >= 25)
-# temp1 = final_data_matrix_2_sub
 # select informative columns
 final_data_matrix_2_sub = select(final_data_matrix_2_sub, Sample, Gene, VAF)
 
@@ -368,14 +336,6 @@ final_data_matrix_2_sub$Sample <- NULL
 final_data_matrix_2_sub[final_data_matrix_2_sub != 0] <- 1
 temp_for_odds_ratio = final_data_matrix_2_sub
 final_data_matrix_2_sub <- as.data.frame(t(final_data_matrix_2_sub))
-
-# run the DISCOVER analysis
-# events <- discover.matrix(final_data_matrix_2_sub)
-# subset <- rowSums(final_data_matrix_2_sub) > 25
-# result.mutex <- pairwise.discover.test(events[subset, ])
-# result.mutex
-# print(result.mutex, fdr.threshold=0.05)
-# result.mutex = as.data.frame(result.mutex)
 
 # odds ratio and fisher's exact p-value for each interaction ####
 # find all pairwise interactions
@@ -465,7 +425,6 @@ for(i in 1:nrow(genes)){
 
   }
   
-  
   # store the results in a dataframe
   odds <- data.frame(matrix(NA, nrow = 1, ncol = 5))
   names(odds) <- c("gene1", "gene2", "odds_ratio", "fishers_exact", "n_cooccur")
@@ -554,12 +513,12 @@ p1 = ggplot(df, aes(x=log(odds_ratio), y=-log10(fishers_q), color = significant,
   # theme(legend.position = c(0.05,.85)) +
   ylab(label= "-log10(q-value)") +
   xlab(label= "log(Odds Ratio)") +
-  scale_size_area(max_size = 5,breaks=c(25,50,100,200,300)) +
+  scale_size_area(max_size = 10,breaks=c(25,50,100,200,300)) +
   labs(title = NULL) 
 
 g = guide_legend(override.aes=list(colour="lightgrey"), "n. co-mut")
 
-p1 = p1 + guides(size = FALSE, color = FALSE)  +
+p1 = p1 + guides(size = "none", color = "none")  +
   annotate(geom="text", x = 1.9, y = 0, label="q < 0.05",
            color="grey")
 
@@ -576,19 +535,10 @@ final_data_matrix_sub$Time_to_OS = (final_data_matrix_sub$Time_to_OS/365)
 
 # make sure that the FLT3 symbols are annotated properly
 for(i in 1:nrow(final_data_matrix_sub)){
-  if(final_data_matrix_sub$Gene[i] == "FLT3" & final_data_matrix_sub$variant_type[i] == "ITD"){
+  if(final_data_matrix_sub$Gene[i] == "FLT3" & final_data_matrix_sub$variant_type[i] %in% c("ITD", "INDEL")){
     final_data_matrix_sub$Gene[i] <- "FLT3-ITD"
   }
-  if(final_data_matrix_sub$Gene[i] == "FLT3" & final_data_matrix_sub$variant_type[i] == "SNV"){
-    final_data_matrix_sub$Gene[i] <- "FLT3-TKD"
-  }
-  if(final_data_matrix_sub$Gene[i] == "FLT3" & final_data_matrix_sub$variant_type[i] == "Deletion"){
-    final_data_matrix_sub$Gene[i] <- "FLT3-TKD"
-  }
-  if(final_data_matrix_sub$Gene[i] == "FLT3" & final_data_matrix_sub$variant_type[i] == "INDEL"){
-    final_data_matrix_sub$Gene[i] <- "FLT3-ITD"
-  }
-  if(final_data_matrix_sub$Gene[i] == "FLT3" & final_data_matrix_sub$variant_type[i] == "other"){
+  if(final_data_matrix_sub$Gene[i] == "FLT3" & final_data_matrix_sub$variant_type[i] %in% c("SNV", "Deletion", "other")){
     final_data_matrix_sub$Gene[i] <- "FLT3-TKD"
   }
 }
@@ -596,7 +546,6 @@ for(i in 1:nrow(final_data_matrix_sub)){
 
 # select informative columns
 final_data_matrix_sub = select(final_data_matrix_sub, Sample, Gene, Time_to_OS, Censor, Cohort)
-
 
 # pairwise mutations and survival ####
 # find all unique pairwise combinations of mutations
@@ -1013,8 +962,8 @@ p2 = ggplot(df, aes(x=df$HR, y=-log10(df$q_value), color = factor(significant), 
   theme_cowplot() +
   geom_hline(yintercept=1, linetype="dashed", color = "#d9d9d9") +
   geom_point(alpha = .75) +
-  scale_size_area(max_size = 5,breaks=c(25,50,100,200,300)) +
-  geom_label_repel(aes(label=labels),size = 3, force = 50) +
+  scale_size_area(max_size = 10,breaks=c(25,50,100,200,300)) +
+  geom_label_repel(aes(label=labels),size = 3, force = 25, max.overlaps = 1) +
   scale_colour_manual(values = c("Favorable"= "#1b7837", "Unfavorable" = "#762a83", "NS"="grey")) + 
   theme_cowplot() +
   # theme(legend.position = c(0.05,.85)) +
@@ -1024,10 +973,10 @@ p2 = ggplot(df, aes(x=df$HR, y=-log10(df$q_value), color = factor(significant), 
   theme(plot.title = element_text(color="black", size=20)) 
 g = guide_legend(override.aes=list(colour="lightgrey"), "n. co-mut")
 
-p2 = p2  + guides(size = g, color = FALSE, )  +
+p2 = p2  + guides(size = g, color = "none")  +
   annotate(geom="text", x = 1.25, y = .75, label="q < 0.05",
            color="grey")+
-  theme(legend.position = "top") 
+  theme(legend.position = "none") 
 
 ggsave(filename = "~/Desktop/MetaAML_results/Figure_2/volcano_plot_co_occurence_survival.pdf", dpi = 300, width = 5, height =  5, units = "in")
 
@@ -1057,22 +1006,6 @@ for(i in 1:nrow(hr_odds)){
   }
 }
 
-# for(i in 1:nrow(hr_odds)){
-#   if(hr_odds$q_value_HR[i] < 0.1 & hr_odds$HR[i] > 1 & hr_odds$q_value_odds[i] < 0.1){
-#     hr_odds$color[i] = "HR q < 0.1\n"
-#   }
-#   if(hr_odds$q_value_HR[i] < 0.1 & hr_odds$HR[i] > 1 & hr_odds$q_value_odds[i] < 0.1){
-#     hr_odds$color[i] = "HR q < 0.1\nOR q < 0.1"
-#   }
-#   if(hr_odds$q_value_HR[i] < 0.1 & hr_odds$HR[i] < 1 & hr_odds$q_value_odds[i] < 0.1){
-#     hr_odds$color[i] = "HR q < 0.1\nHR<1\nOR q < 0.1"
-#   }
-#   if(hr_odds$q_value_HR[i] < 0.1 & hr_odds$HR[i] < 1 & hr_odds$q_value_odds[i] < 0.1){
-#     hr_odds$color[i] = "HR q < 0.1\nHR<1\nOR q < 0.1"
-#   }
-# }
-
-
 # add annotations for most significant interactions
 hr_odds$labels = NA
 
@@ -1090,11 +1023,8 @@ p3 = ggplot(hr_odds, aes(x = log(odds_ratio), y = log(HR), color = as.factor(col
   ylab("log(Hazard Ratio)") +
   scale_color_manual(values = c("#1b7837",  "#762a83", "grey")) +
   scale_fill_manual(values = c("#1b7837",  "#762a83", "grey")) +
-  # geom_point(shape = 1, size = num_pts, colour = "black") +
   geom_hline(yintercept=log(1), linetype="dashed", color = "grey") +
   geom_vline(xintercept=log(1), linetype="dashed", color = "grey") +
-  # geom_label_repel(aes(label=labels),
-  # size = 3) +
   geom_smooth(method = lm, aes(fill = color),  alpha = .25) +
   stat_cor(
     aes(label = paste(..rr.label.., ..p.label.., sep = "~`,`~")),
@@ -1103,11 +1033,11 @@ p3 = ggplot(hr_odds, aes(x = log(odds_ratio), y = log(HR), color = as.factor(col
     
   ) +
   theme_cowplot() +
-  scale_size_area(max_size = 5,breaks=c(25,50,100,200,300)) +
+  scale_size_area(max_size = 10,breaks=c(25,50,100,200,300)) +
   theme(plot.title = element_text(color="black", size=20))
 g = guide_legend(override.aes=list(colour="lightgrey"), "n. co-mut")
 
-p3  = p3 + guides(size = FALSE, color = FALSE, fill = FALSE) +
+p3  = p3 + guides(size = "none", color = "none", fill = "none") +
   annotate(geom="text", x = 1.8, y = .25, label="26%",
            color="#762a83") +
   annotate(geom="text", x = -1.8, y = .25, label="28%",
@@ -1161,11 +1091,11 @@ prop.test(table(or_hr$or, or_hr$hr), correct=FALSE)
 
 # add the legend to the row we made earlier. Give it one-third of 
 # the width of one plot (via rel_widths).
-p = ggarrange(p1, p2, p3, ncol=3, nrow=1, common.legend = TRUE, legend="right")
+p = ggarrange(p1, p2, p3, ncol=3, nrow=1, common.legend = TRUE, legend="right", vjust = -0.8)
 
-g = guide_legend(override.aes=list(colour="lightgrey"), "n. co-mut")
+g = guide_legend(override.aes=list(colour="lightgrey"), "n. nco-mut")
 
-p  + guides(size = g, color = FALSE, fill = FALSE) 
+p  + guides(size = g, color = "none", fill = "none") 
       
 ggsave(filename = "~/Desktop/MetaAML_results/Figure_2/correlation_of_odds_ratio_and_HR_de_novo_all.pdf", dpi = 300, width = 15, height = 5, units = "in")
 
@@ -1199,7 +1129,7 @@ for(i in 1:nrow(final_data_matrix_2_alt)){
 
 three_mutations = final_data_matrix_2_alt %>%
   group_by(Gene) %>%
-  count(Gene, sort = TRUE) %>%
+  dplyr::count(Gene, sort = TRUE) %>%
   filter(n > 50)
 
 # find all 3-way mutation combinations
@@ -1258,7 +1188,7 @@ three_mutations_pts[three_mutations_pts == 0] <- "WT"
 # function to find genes not in a list
 "%ni%" <- Negate("%in%") 
 
-# loop through all of the mutation genotype combinations and label each patient based on the genotype. This will be done foe specific genotypes and 
+# loop through all of the mutation genotype combinations and label each patient based on the genotype. This will be done foe specific genotypes and broad relationships
 three_mutations_pts_simple = three_mutations_pts
 
 for(i in 1:nrow(genes_all_3_mut_n_over_5)){
@@ -1301,19 +1231,19 @@ for(i in 1:nrow(genes_all_3_mut_n_over_5)){
 }
 
 # select the survival data
-three_mutations_clinical = three_mutations_clinical %>%
+three_mutations_clinical_surv = three_mutations_clinical %>%
   select(Sample, Time_to_OS, Censor) %>%
   unique()
 
 # pair survival data with genotypes on a granular level
-genotype_survival = left_join(three_mutations_pts, three_mutations_clinical, by = "Sample")
+genotype_survival = left_join(three_mutations_pts, three_mutations_clinical_surv, by = "Sample")
 genotype_survival$Censor = as.numeric(genotype_survival$Censor)
 genotype_survival$Time_to_OS = genotype_survival$Time_to_OS/365
 
 write_csv(genotype_survival, "~/Desktop/MetaAML_results/Figure_2/genotype_combinations.csv")
 
 # pair survival data with genotypes on a broad level
-genotype_survival_simple = left_join(three_mutations_pts_simple, three_mutations_clinical, by = "Sample")
+genotype_survival_simple = left_join(three_mutations_pts_simple, three_mutations_clinical_surv, by = "Sample")
 genotype_survival_simple$Censor = as.numeric(genotype_survival_simple$Censor)
 genotype_survival_simple$Time_to_OS = genotype_survival_simple$Time_to_OS/365
 
@@ -1324,10 +1254,8 @@ for(i in 3:50){
   
   genotype_survival_simple[[i]][!grepl("2_mut|3_mut",genotype_survival_simple[[i]])]<-NA
   
-  genotype_names = paste(colnames(genotype_survival_simple)[i])
-  genotype_names = gsub("_", " + ", genotype_names, fixed=TRUE)
-  
-  
+  genotype_names1 = paste(colnames(genotype_survival_simple)[i])
+  genotype_names = gsub("_", " + ", genotype_names1, fixed=TRUE)
   
   fit <- survfit(Surv(Time_to_OS, Censor) ~ genotype_survival_simple[[i]], data = genotype_survival_simple)
   names(fit$strata) = as.character(names(fit$strata))
@@ -1339,9 +1267,7 @@ for(i in 3:50){
                          risk.table = T,
                          pval = T,
                          pval.coord = c(0, 0),
-                         # ggtheme = theme_pubr(),
                          title = paste(genotype_names),
-                         # palette = "uchicago",
                          palette = c("darkgrey", "darkred"),
                          risk.table.y.text = FALSE,
                          tables.y.text = FALSE,
@@ -1350,7 +1276,7 @@ for(i in 3:50){
                          xlab = "Years")
   
   print(surv_plot)
-  png(filename = paste("~/Desktop/MetaAML_results/Figure_2/Supplimental/2_3_genotypes/broad/",genotype_names,"survival.png", sep = ""), res = 300, width = 6, height = 6, units = "in")
+  png(filename = paste("~/Desktop/MetaAML_results/Figure_2/Supplimental/2_3_genoptypes/broad/",genotype_names1,"survival.png", sep = ""), res = 300, width = 5, height = 5, units = "in")
   # ggsave(file = paste("~/Desktop/Majeti_Lab/Manuscripts/Meta_AML/Final_submission_materials/Nat_Comm/Revisions/Comment_2/2_3_genotypes/broad/",genotype_names,"survival.pdf", sep = ""), print(surv_plot))
   
   surv_plot
@@ -1490,26 +1416,19 @@ genes_all_3_mut_n_over_5 = genes_all_3_mut_n_over_5 %>%
 
 
 ggplot(data=genes_all_3_mut_n_over_5, aes(x=reorder(genotype, -n_3_mut), y = n_3_mut, fill = `Survival association`)) +
-  theme_cowplot() +
+  theme_cowplot(font_size = 15) +
   geom_bar(stat="identity") +
   scale_fill_manual(values=c('grey', "darkred")) +
-  geom_text(aes(label=n_3_mut), vjust=-0.3, size=3.5) +
+  geom_text(aes(label=n_3_mut), vjust=-0.3, size=5) +
   theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust = 1), axis.title.x = element_blank(), legend.position = c(.9, 0.5)) +
-  ylab("\n\n\n# of patiens\nwith 3 mutations") 
+  ylab("\n\n\n# of patiens\nwith 3 mutations") +
+  ylim(0,140)
 
 ggsave(filename = "~/Desktop/MetaAML_results/Figure_2/three_mut_genotype_distribution.pdf", dpi = 300, width = 20, height = 5, units = "in")
 
 
 
-
-
-
-
-
-
-
-
-
+# Supplimental ####
 # VAF Scatterplot ####
 load("~/Desktop/MetaAML_results/final_data_matrix.RData")
 
@@ -1580,8 +1499,8 @@ vaf_scatterplot_function <- function(pt_subset, gene_1_2, save_plot){
     # make the scatterplot
     
     scatter_plot = ggplot(gene_1_and_2, aes(x = gene_1_and_2$VAF.y, y = gene_1_and_2$VAF.x)) +
-theme_cowplot() +
-    geom_point(aes(color = Clonality), size = 3.5, alpha = 0.75) +
+      theme_cowplot() +
+      geom_point(aes(color = Clonality), size = 3.5, alpha = 0.75) +
       xlim(0,(max(gene_1_and_2$VAF.y) + .05))+
       ylim(0,(max(gene_1_and_2$VAF.x) + .05))+
       xlab(paste(gene_y, " VAF", sep ="")) +
@@ -1609,7 +1528,8 @@ vaf_scatterplot_function(pt_subset = "De novo", gene_1_2 = c("NRAS", "PTPN11"), 
 
 
 
-# Supplimental ####
+
+
 
 load("~/Desktop/MetaAML_results/final_data_matrix.RData")
 
@@ -1780,11 +1700,11 @@ ggsave(filename = "~/Desktop/MetaAML_results/Figure_2/Supplimental/Individual_ge
 write.csv(gene_pairs_list_final_adj, file = "~/Desktop/MetaAML_results/Figure_2/Supplimental/gene_clinical_features.csv")
 
 
-
+# multi-mut per gene/gategory ####
 # 4. The authors should make it more clear how they are addressing cases in which there are multiple mutations in the same gene or pathway (i.e. RAS/MAPK-pathway mutations). Does convergent evolution influence clinical correlates or survival outcomes?
-load("~/Desktop/MetaAML_results/final_data_matrix_2.RData")
+load("~/Desktop/MetaAML_results/final_data_matrix.RData")
 
-final_data_matrix_2_alt = final_data_matrix_2 %>%
+final_data_matrix_2_alt = final_data_matrix %>%
   subset(Subset == "de_novo")
 
 for(i in 1:nrow(final_data_matrix_2_alt)){
@@ -1841,7 +1761,7 @@ for(i in 1:nrow(final_data_matrix_2_alt)){
 
 convergent_gene = final_data_matrix_2_alt %>%
   group_by(Gene) %>%
-  count(Sample, sort = TRUE) 
+  dplyr::count(Sample, sort = TRUE) 
 
 convergent_clinical = final_data_matrix_2_alt %>%
   subset(Subset == "de_novo") %>%
@@ -1852,20 +1772,24 @@ convergent_clinical_merged = left_join(convergent_clinical, convergent_gene, by 
 
 convergent_genes = final_data_matrix_2_alt %>%
   group_by(Gene) %>%
-  count(Sample, sort = TRUE) %>%
+  dplyr::count(Sample, sort = TRUE) %>%
   filter(n > 1) %>%
   distinct(Gene)
 
+convergent_clinical_merged <- convergent_clinical_merged %>% 
+  mutate_at(c(2:10), as.numeric)
+
 variable_df_list_1 = list()
+variable_df_list_2 =  list()
 forest_plot_data_list = list()
 
 k = 1
 for(i in 1:nrow(convergent_genes)){
   sub_dat_final = convergent_clinical_merged %>%
     subset(Gene == convergent_genes$Gene[i]) %>%
-    distinct(Sample, BM_blast_percent, PB_blast_percent, WBC, Hemoglobin, LDH, Platelet, Age, Censor, Time_to_OS, n)
+    distinct(Sample, BM_blast_percent, PB_blast_percent, WBC, Hemoglobin, LDH, Platelet, Age, Censor, Time_to_OS, n, Gene)
   
-  sub_dat_final$n = as.factor(ifelse(sub_dat_final$n>1, ">1", "1"))
+  sub_dat_final$n = as.factor(ifelse(sub_dat_final$n>1, "2", "1"))
   
   if(length(which(sub_dat_final$n != 1)) > 9){
     l = 1
@@ -1882,8 +1806,8 @@ for(i in 1:nrow(convergent_genes)){
       
       effect_size = cohens_d(data = sub_dat_final, Variable ~ n)$effsize
       effect_size_ci = cohens_d(data = sub_dat_final, Variable ~ n, ci = TRUE)
-      n_n1 = as.numeric(length(which(sub_dat_final$n == ">1")))
-      n_n2 = as.numeric(length(which(sub_dat_final$n == "1")))
+      n_n1 = as.numeric(length(which(sub_dat_final$n == 1)))
+      n_n2 = as.numeric(length(which(sub_dat_final$n == 2)))
       effect_size_ci = psych::cohen.d.ci(d = effect_size, n = n, n1 = n_n1, n2 = n_n2)
       
       variable_df <- data.frame(matrix(NA, nrow = 1, ncol = 6))
@@ -1892,8 +1816,8 @@ for(i in 1:nrow(convergent_genes)){
       variable_df[1,1] <- paste(col_name)
       variable_df[1,2] <- convergent_genes$Gene[i]
       variable_df[1,3] <- effect_size
-      variable_df[1,4] <- effect_size_ci$conf.low[1]
-      variable_df[1,5] <- effect_size_ci$conf.high[1]
+      variable_df[1,4] <- effect_size_ci[1,1]
+      variable_df[1,5] <- effect_size_ci[1,3]
       variable_df[1,6] <- p_val
       
       # Add each list in the loop to a list of lists and rename column
@@ -1912,13 +1836,10 @@ for(i in 1:nrow(convergent_genes)){
     
     # calculate hazard ratios and confidence intervals for survival outcomes
     sub_dat_final$Censor = as.numeric(sub_dat_final$Censor)
-    # OS_fit <- survfit(Surv(Time_to_OS, Censor) ~ 1, data=sub_dat_final)
-    # OS_trt_fit <- survfit(Surv(Time_to_OS, Censor) ~ n, data=sub_dat_final, conf.type = "log-log")
-    
     # run the Cox model
     model <- coxph( Surv(Time_to_OS, Censor) ~ n,
                     data = sub_dat_final )
-    
+
     # extract the informative data from the survival model
     array_dat = summary(model)$conf.int[1:4]
     array_dat[5] = convergent_genes$Gene[i]
@@ -1940,15 +1861,15 @@ forest_plot_data_list_all$q_val = p.adjust(forest_plot_data_list_all$log_rank_p)
 
 # bind all of the clinical correlates data
 variable_df_list_all <- do.call(rbind, variable_df_list_2)
-variable_df_list_all$sig = NA
+variable_df_list_all$sig = "q > 0.3"
 for(i in 1:nrow(variable_df_list_all)){
   if(variable_df_list_all$q_val[i] > 0.3 ){
     variable_df_list_all$sig[i] = "q > 0.3"
   }
-  if(variable_df_list_all$q_val[i] < 0.3 & variable_df_list_all$q_val[i] > 0.1 & variable_df_list_all$p_value[i] < 0.05){
+  if(variable_df_list_all$q_val[i] < 0.3 & variable_df_list_all$q_val[i] > 0.1 & variable_df_list_all$p_value[i] <=0.05){
     variable_df_list_all$sig[i] = "q < 0.3"
   }
-  if(variable_df_list_all$q_val[i] < 0.1 & variable_df_list_all$p_value[i] < 0.05){
+  if(variable_df_list_all$q_val[i] < 0.1 ){
     variable_df_list_all$sig[i] = "q < 0.1"
   }
 }
@@ -1960,7 +1881,7 @@ variable_df_list_all$Variable = factor(variable_df_list_all$Variable, levels=c('
 # plot the discrete results
 p1 = ggplot(variable_df_list_all, aes(x = Mutated_Gene, y = effect_size, label = p_value)) +
   geom_hline(yintercept=0, linetype = "dashed", color = "black") +
-  theme_cowplot() +
+  theme_cowplot(font_size = 10) +
   geom_pointrange(size = 0.75, stat = "identity", 
                   aes(x = Mutated_Gene, ymin = CI_lower, ymax = CI_upper, y = effect_size, color = sig)) +
   scale_color_manual(values = c( "q < 0.3" = "#1F968BFF", "q < 0.1" = "#482677FF", "q > 0.3" = "grey")) +
@@ -1976,7 +1897,7 @@ p1 = p1 + facet_grid(. ~ Variable) +
   theme(strip.background = element_rect(colour="black", fill="white",
                                         size=1.5, linetype="solid"))
 
-ggsave(filename = "~/Desktop/Majeti_Lab/Manuscripts/Meta_AML/Final_submission_materials/Nat_Comm/Revisions/Comment_4/multi_mut_clinical_features_discrete.pdf", dpi = 300, width = 15, height = 3, units = "in") 
+ggsave(filename = "~/Desktop/MetaAML_results/Figure_2/Supplimental/multi_mut_clinical_features_discrete.pdf", dpi = 300, width = 15, height = 3, units = "in") 
 
 # vizualize all of the survival hazard ratios
 
@@ -2044,19 +1965,19 @@ forest_plot_data_list_all$Mutated_Gene <- factor(forest_plot_data_list_all$Mutat
 
 p2 = ggplot(forest_plot_data_list_all, aes(x = reorder(Mutated_Gene, -HR), y = HR, label = p_q_text)) +
   geom_hline(yintercept=1, linetype="dashed", color = "black") +
-  geom_text(aes(Mutated_Gene, HR+2), nudge_x = 0.35, nudge_y = 0) +
+  geom_text(aes(Mutated_Gene, HR+0.15), nudge_x = 0.5, nudge_y = 0, size = 2) +
   geom_pointrange(size = 0.75, stat = "identity", shape = 19,
                   # fill = "white",
                   aes(x = Mutated_Gene, ymin = Lower_CI, ymax = Upper_CI, y = HR, color = sig_color)) +
   scale_color_manual(values = c("1" = "#1b7837", "2" = "#762a83"))+
   ylab("Hazard Ratio\n(multi-mut vs. 1 mut)")+
   # ylim(0,11.5)+
-  theme_cowplot() +
+  theme_cowplot(font_size = 10) +
   theme(legend.position = "none",
         axis.title.y=element_blank()) +
   coord_flip()
 
-ggsave(filename = "~/Desktop/Majeti_Lab/Manuscripts/Meta_AML/Final_submission_materials/Nat_Comm/Revisions/Comment_4/multi_mut_survival_forrest_plot.pdf", dpi = 300, width = 4, height = 3, units = "in")
+ggsave(filename = "~/Desktop/MetaAML_results/Figure_2/Supplimental/multi_mut_survival_forrest_plot.pdf", dpi = 300, width = 4, height = 3, units = "in")
 
 
 
@@ -2064,13 +1985,10 @@ ggsave(filename = "~/Desktop/Majeti_Lab/Manuscripts/Meta_AML/Final_submission_ma
 ### mutation category analysis ###
 convergent_functional_category = final_data_matrix_2_alt %>%
   group_by(mutation_category) %>%
-  count(Sample, sort = TRUE) %>%
+  dplyr::count(Sample, sort = TRUE) %>%
   subset(n>0) %>%
   na.omit() %>%
   distinct()
-# convergent_functional_category$mutation_category = NULL
-# names(convergent_functional_category)[names(convergent_functional_category) == "n"] = "n_cat_muts"
-# convergent_functional_category = distinct(convergent_functional_category)
 
 # add the mutational categoty data
 convergent_clinical_merged_2 = convergent_clinical_merged %>%
@@ -2084,20 +2002,20 @@ convergent_clinical_merged_cat = convergent_clinical_merged_cat %>%
 
 convergent_categories = final_data_matrix_2_alt %>%
   group_by(mutation_category) %>%
-  count(Sample, sort = TRUE) %>%
+  dplyr::count(Sample, sort = TRUE) %>%
   distinct(mutation_category) %>%
   na.omit()
 
 variable_df_list_2 = list()
 forest_plot_data_list_2 = list()
-
+options(scipen = 999)
 k = 1
 for(i in 1:nrow(convergent_categories)){
   sub_dat_final = convergent_clinical_merged_cat %>%
     subset(mutation_category == convergent_categories$mutation_category[i]) %>%
     distinct(Sample, BM_blast_percent, PB_blast_percent, WBC, Hemoglobin, LDH, Platelet, Age, Censor, Time_to_OS, n)
   
-  sub_dat_final$n = ifelse(sub_dat_final$n>1, ">1", "1")
+  sub_dat_final$n = ifelse(sub_dat_final$n>1, "2", "1")
   
   if(length(which(sub_dat_final$n != 1)) > 9){
     l = 1
@@ -2114,10 +2032,6 @@ for(i in 1:nrow(convergent_categories)){
       
       effect_size = cohens_d(data = sub_dat_final, Variable ~ n)$effsize
       effect_size_ci = cohens_d(data = sub_dat_final, Variable ~ n, ci = TRUE)
-      
-      # n_n1 = as.numeric(length(which(sub_dat_final$n == ">1")))
-      # n_n2 = as.numeric(length(which(sub_dat_final$n == "1")))
-      # effect_size_ci = psych::cohen.d.ci(d = effect_size, n = n, n1 = n_n1, n2 = n_n2)
       
       variable_df <- data.frame(matrix(NA, nrow = 1, ncol = 6))
       names(variable_df) <- c("Variable", "Mutated_Category", "effect_size", "CI_lower", "CI_upper", "p_value")
@@ -2171,15 +2085,15 @@ forest_plot_data_list_2_all$q_val = p.adjust(forest_plot_data_list_2_all$log_ran
 
 # bind all of the clinical correlates data
 variable_df_list_2_all <- do.call(rbind, variable_df_list_2)
-variable_df_list_all$sig = NA
+variable_df_list_all$sig = "q > 0.3"
 for(i in 1:nrow(variable_df_list_2_all)){
   if(variable_df_list_2_all$q_val[i] > 0.3 ){
     variable_df_list_2_all$sig[i] = "q > 0.3"
   }
-  if(variable_df_list_2_all$q_val[i] < 0.3 & variable_df_list_2_all$q_val[i] > 0.1 & variable_df_list_all$p_value[i] < 0.05){
+  if(variable_df_list_2_all$q_val[i] < 0.3 & variable_df_list_2_all$q_val[i] > 0.1 & variable_df_list_2_all$p_value[i] <= 0.05){
     variable_df_list_2_all$sig[i] = "q < 0.3"
   }
-  if(variable_df_list_2_all$q_val[i] < 0.1 & variable_df_list_2_all$p_value[i] < 0.05){
+  if(variable_df_list_2_all$q_val[i] < 0.1){
     variable_df_list_2_all$sig[i] = "q < 0.1"
   }
 }
@@ -2191,7 +2105,7 @@ variable_df_list_2_all$Variable = factor(variable_df_list_2_all$Variable, levels
 # plot the discrete results
 p3 = ggplot(variable_df_list_2_all, aes(x = Mutated_Category, y = effect_size, label = p_value)) +
   geom_hline(yintercept=0, linetype = "dashed", color = "black") +
-  theme_cowplot() +
+  theme_cowplot(font_size = 10) +
   geom_pointrange(size = 0.75, stat = "identity", 
                   aes(x = Mutated_Category, ymin = CI_lower, ymax = CI_upper, y = effect_size, color = sig)) +
   scale_color_manual(values = c("q < 0.3" = "#1F968BFF", "q < 0.1" = "#482677FF", "q > 0.3" = "grey")) +
@@ -2207,15 +2121,17 @@ p3 = p3 + facet_grid(. ~ Variable) +
   theme(strip.background = element_rect(colour="black", fill="white",
                                         size=1.5, linetype="solid"))
 
-ggsave(filename = "~/Desktop/Majeti_Lab/Manuscripts/Meta_AML/Final_submission_materials/Nat_Comm/Revisions/Comment_4/multi_category_mut_clinical_features_discrete.pdf", dpi = 300, width = 13, height = 2.5, units = "in") 
+ggsave(filename = "~/Desktop/MetaAML_results/Figure_2/Supplimental/multi_category_mut_clinical_features_discrete.pdf", dpi = 300, width = 13, height = 2.5, units = "in") 
 
 # vizualize all of the survival hazard ratios
-
 forest_plot_data_list_2_all$sig_color = 0
 
 for(i in 1:nrow(forest_plot_data_list_2_all)){
   if(forest_plot_data_list_2_all$log_rank_p[i] < 0.05 & forest_plot_data_list_2_all$HR[i] < 1){
     forest_plot_data_list_2_all$sig_color[i] = 1
+  }
+  if(forest_plot_data_list_2_all$q_val[i] < 0.05 & forest_plot_data_list_2_all$HR[i] > 1){
+    forest_plot_data_list_2_all$sig_color[i] = 2
   }
   if(forest_plot_data_list_2_all$log_rank_p[i] < 0.05 & forest_plot_data_list_2_all$HR[i] > 1){
     forest_plot_data_list_2_all$sig_color[i] = 2
@@ -2227,36 +2143,31 @@ forest_plot_data_list_2_all$sig_color = as.factor(forest_plot_data_list_2_all$si
 forest_plot_data_list_2_all = subset(forest_plot_data_list_2_all, forest_plot_data_list_2_all$Upper_CI != "Inf")
 forest_plot_data_list_2_all$categories <- reorder(forest_plot_data_list_2_all$categories, forest_plot_data_list_2_all$HR)
 
+forest_plot_data_list_2_all$p_text = round(as.numeric(forest_plot_data_list_2_all$log_rank_p), 3)
+forest_plot_data_list_2_all$q_text = as.numeric(round(forest_plot_data_list_2_all$q_val, 2))
 
-forest_plot_data_list_2_all$p_text = NA
 for(i in 1:nrow(forest_plot_data_list_2_all)){
   if(forest_plot_data_list_2_all$log_rank_p[i] < 0.05){
-    forest_plot_data_list_2_all$p_text[i] = forest_plot_data_list_2_all$log_rank_p[i]
+    forest_plot_data_list_2_all$p_text[i] = forest_plot_data_list_2_all$p_text[i]
   }
-}
-forest_plot_data_list_2_all$q_text = NA
-for(i in 1:nrow(forest_plot_data_list_2_all)){
-  if(forest_plot_data_list_2_all$q_val[i] < 0.5){
-    forest_plot_data_list_2_all$q_text[i] = forest_plot_data_list_2_all$q_val[i]
-  }
-}
-
-forest_plot_data_list_2_all$p_text = as.numeric(forest_plot_data_list_2_all$p_text)
-forest_plot_data_list_2_all$q_text = as.numeric(forest_plot_data_list_2_all$q_text)
-
-forest_plot_data_list_2_all$p_text = round(forest_plot_data_list_2_all$p_text, 3)
-forest_plot_data_list_2_all$q_text = round(forest_plot_data_list_2_all$q_text, 2)
-
-for(i in 1:nrow(forest_plot_daforest_plot_data_list_2_allta_list_all)){
   if(forest_plot_data_list_2_all$log_rank_p[i] < 0.01){
     forest_plot_data_list_2_all$p_text[i] = "p < 0.01"
   }
-  if(forest_plot_data_list_2_all$log_rank_p[i] >= 0.01 & forest_plot_data_list_2_all$log_rank_p[i] <= 0.05){
-    forest_plot_data_list_2_all$p_text[i] = paste("p =", paste(forest_plot_data_list_2_all$p_text[i]))
+  if(forest_plot_data_list_2_all$q_val[i] < 0.01){
+    forest_plot_data_list_2_all$q_text[i] = "q < 0.01"
   }
 }
 
-forest_plot_data_list_2_all$p_q_text = paste(forest_plot_data_list_2_all$p_text, "; q = ", forest_plot_data_list_2_all$q_text, sep = "")
+for(i in 1:nrow(forest_plot_data_list_2_all)){
+  if(forest_plot_data_list_2_all$log_rank_p[i] >= 0.01 & forest_plot_data_list_2_all$log_rank_p[i] <= 0.05){
+    forest_plot_data_list_2_all$p_text[i] = paste("p =", paste(forest_plot_data_list_2_all$p_text[i]))
+  }
+  if(forest_plot_data_list_2_all$q_val[i] >= 0.01 & forest_plot_data_list_2_all$q_val[i] <= 0.05){
+    forest_plot_data_list_2_all$q_text[i] = paste("q =", paste(forest_plot_data_list_2_all$q_text[i]))
+  }
+}
+
+forest_plot_data_list_2_all$p_q_text = paste(forest_plot_data_list_2_all$p_text, "; ", forest_plot_data_list_2_all$q_text, sep = "")
 
 for(i in 1:nrow(forest_plot_data_list_2_all)){
   if(forest_plot_data_list_2_all$log_rank_p[i] > 0.05){
@@ -2275,28 +2186,20 @@ forest_plot_data_list_2_all$Mutated_Category <- factor(forest_plot_data_list_2_a
 
 p4 = ggplot(forest_plot_data_list_2_all, aes(x = reorder(Mutated_Category, -HR), y = HR, label = p_q_text)) +
   geom_hline(yintercept=1, linetype="dashed", color = "black") +
-  geom_text(aes(Mutated_Category, HR+.35), nudge_x = 0.35, nudge_y = 0) +
+  geom_text(aes(Mutated_Category, HR+0.15), nudge_x = 0.5, nudge_y = 0, size = 2) +
   geom_pointrange(size = 0.75, stat = "identity", shape = 19,
-                  # fill = "white",
                   aes(x = Mutated_Category, ymin = Lower_CI, ymax = Upper_CI, y = HR, color = sig_color)) +
   scale_color_manual(values = c("1" = "#1b7837", "2" = "#762a83"))+
   ylab("Hazard Ratio\n(multi-mut vs. 1 mut)")+
-  # ylim(0,11.5)+
-  theme_cowplot() +
+  theme_cowplot(font_size = 10) +
   theme(legend.position = "none",
         axis.title.y=element_blank()) +
   coord_flip()
 
-ggsave(filename = "~/Desktop/Majeti_Lab/Manuscripts/Meta_AML/Final_submission_materials/Nat_Comm/Revisions/Comment_4/multi_category_mut_survival_forrest_plot.pdf", dpi = 300, width = 4, height = 3, units = "in")
+ggsave(filename = "~/Desktop/MetaAML_results/Figure_2/Supplimental/multi_category_mut_survival_forrest_plot.pdf", dpi = 300, width = 4, height = 3, units = "in")
 
-# ggarrange(p1, p2, p3, p4,
-# ncol = 2,
-#           # legend = "right",
-#           align = "hv")
-
+# arrange all of the plots together
 library(patchwork)
-p = (p1 + p2) / (p3 + p4) 
+p1 + p2 + p3 + p4 + plot_layout(widths = c(5, 1.5), heights = c(1,.75))
 
-p1 + p2 + p3 + p4 +plot_layout(widths = c(5, 1), heights = c(1,1))
-
-ggsave(filename = "~/Desktop/Majeti_Lab/Manuscripts/Meta_AML/Final_submission_materials/Nat_Comm/Revisions/Comment_4/convergent_panel_2.pdf", dpi = 300, width = 20, height = 7.5, units = "in")
+ggsave(filename = "~/Desktop/MetaAML_results/Figure_2/Supplimental/convergent_panel_2.pdf", dpi = 300, width = 15, height = 5.75, units = "in")
