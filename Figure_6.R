@@ -1,9 +1,9 @@
 # ========================================================================================================================================== #
 # Figure_6.R
 # Author : Brooks Benard, bbenard@stanford.edu
-# Date: 08/23/2021
+# Date: 11/02/2021
 # Description: This script analyses if the VAF of a specific mutation correlates with sensitivity or resistance to different drugs in the Beat AML study
-# This script will download, process, and generate the restults as seen in Figure 6 of the manuscript Benard et al. "Clonal architecture and variant allele frequency correlate with clinical outcomes and drug response in acute myeloid leukemia".
+# This script will download, process, and generate the restults as seen in Figure 6 of the manuscript Benard et al. "Clonal architecture predicts clinical outcomes and drug sensitivity in acute myeloid leukemia".
 # ========================================================================================================================================== #
 
 # ================ #
@@ -182,7 +182,7 @@ for(i in 1:nrow(BeatAML_aggrigate)){
 BeatAML_sample_data_types <- read_excel("~/Desktop/MetaAML_results/raw_data/41586_2018_623_MOESM3_ESM.xlsx", sheet = 5)
 
 # de novo 
-pt_subset <- subset(BeatAML_sample_data_types, BeatAML_sample_data_types$isRelapse == "FALSE" & BeatAML_sample_data_types$isDenovo == "TRUE")
+pt_subset <- subset(BeatAML_sample_data_types, BeatAML_sample_data_types$isRelapse == "FALSE" & BeatAML_sample_data_types$isTransformed == "TRUE")
 
 # pt_subset <- subset(BeatAML_sample_data_types, BeatAML_sample_data_types$isRelapse == "FALSE")
 

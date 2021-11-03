@@ -1,8 +1,8 @@
 # ========================================================================================================================================== #
 # Figure_1.R
 # Author : Brooks Benard, bbenard@stanford.edu
-# Date: 09/30/2021
-# Description: This script will perform all analyses and generate plots for Figure 1 and related suppliments for Benard et al. "Clonal architecture and variant allele frequency correlate with clinical outcomes and drug response in acute myeloid leukemia"
+# Date: 11/02/2021
+# Description: This script will perform all analyses and generate plots for Figure 1 and related suppliments for Benard et al. "Clonal architecture predicts clinical outcomes and drug response in acute myeloid leukemia"
 # ========================================================================================================================================== #
 # Figure 1A ####
 # UpSet plot of cohort ####
@@ -1552,16 +1552,16 @@ res$gene = rownames(res)
 
 
 res$gene <- factor(res$gene, levels = res$gene[order(res$HR)])
-res$log_rank_p = round(res$p.value, 3)
+# res$log_rank_p = round(res$p.value, 3)
 res$p_text = NA
 
 for(i in 1:nrow(res)){
-  if(res$log_rank_p[i] <= 0.05 & res$log_rank_p[i] >= 0.001){
-    res$p_text[i] = paste("p = ", res$log_rank_p[i], sep = "")
-  } 
-  if(res$log_rank_p[i] == 0){
-    res$p_text[i] = paste("p < 0.001")
-  } 
+  if(res$p.value[i] <= 0.05){
+    res$p_text[i] = paste("p = ", res$p.value[i], sep = "")
+  }
+  # if(res$log_rank_p[i] == 0){
+  #   res$p_text[i] = paste("p < 0.001")
+  # }
   if(res$log_rank_p[i] > 0.05){
     res$p_text[i] = ""
   }
@@ -1602,13 +1602,13 @@ for(i in 1:nrow(res)){
 }
 
 # extract the p-value and hazard ratio for the individual interactions
-p = round(as.numeric(summary(model)$sctest[3]), 3)
-
-p = ifelse(p < 0.001, paste0("p < 0.001"), paste("p =", p))
-
-hr = paste("HR = ", round(as.numeric(forest$HR), 2), " (", round(as.numeric(forest$lower_95), 2), "-", round(as.numeric(forest$upper_95), 2), ")", sep = "")
-
-p_hr = paste(p, "; ", hr, sep = "")
+# p = round(as.numeric(summary(model)$sctest[3]), 5)
+# 
+# # p = ifelse(p < 0.001, paste0("p < 0.001"), paste("p =", p))
+# 
+# hr = paste("HR = ", round(as.numeric(forest$HR), 2), " (", round(as.numeric(forest$lower_95), 2), "-", round(as.numeric(forest$upper_95), 2), ")", sep = "")
+# 
+# p_hr = paste(p, "; ", hr, sep = "")
 
 # color coded by mutation category plot
 k1 = ggplot(res, aes(x = reorder(gene, -HR), y = HR, label = res$p_text)) +
@@ -1630,7 +1630,7 @@ k1 = ggplot(res, aes(x = reorder(gene, -HR), y = HR, label = res$p_text)) +
         axis.ticks.y = element_blank()) +
   coord_flip()
 
-ggsave(filename = "~/Desktop/MetaAML_results/Figure_1/Supplimental/individual_gene_HR_forrest_plot_de_novo.pdf", dpi = 300, width = 9, height = 6, units = "in")
+ggsave(filename = "~/Desktop/MetaAML_results/Figure_1/Supplimental/individual_gene_HR_forrest_plot_de_novo.pdf", dpi = 300, width = 9, height = 5, units = "in")
 
 
 # VAF per cohort ####

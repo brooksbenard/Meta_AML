@@ -1,8 +1,8 @@
 # ========================================================================================================================================== #
 # Figure_2.R
 # Author : Brooks Benard, bbenard@stanford.edu
-# Date: 08/23/2021
-# Description: This script will perform survival and mutation co-occurence analyses as seen in Figure 2 and related suppliments of the manuscript Benard et al. "Clonal architecture and variant allele frequency correlate with clinical outcomes and drug response in acute myeloid leukemia".
+# Date: 11/02/2021
+# Description: This script will perform survival and mutation co-occurence analyses as seen in Figure 2 and related suppliments of the manuscript Benard et al. "Clonal architecture predicts clinical outcomes and drug sensitivity in acute myeloid leukemia".
 # ========================================================================================================================================== #
 
 # ================ #
@@ -1276,11 +1276,9 @@ for(i in 3:50){
                          xlab = "Years")
   
   print(surv_plot)
-  png(filename = paste("~/Desktop/MetaAML_results/Figure_2/Supplimental/2_3_genoptypes/broad/",genotype_names1,"survival.png", sep = ""), res = 300, width = 5, height = 5, units = "in")
-  # ggsave(file = paste("~/Desktop/Majeti_Lab/Manuscripts/Meta_AML/Final_submission_materials/Nat_Comm/Revisions/Comment_2/2_3_genotypes/broad/",genotype_names,"survival.pdf", sep = ""), print(surv_plot))
   
-  surv_plot
-  print(surv_plot)
+  pdf(paste("~/Desktop/MetaAML_results/Figure_2/Supplimental/2_3_genoptypes/broad/",genotype_names1,"_survival.pdf", sep = ""), width = 5, height = 5)
+  print(surv_plot, newpage = FALSE)
   dev.off()
   
   
@@ -1518,7 +1516,7 @@ vaf_scatterplot_function <- function(pt_subset, gene_1_2, save_plot){
     print(scatter_plot)
     
     if(save_plot == T){
-      ggsave(filename =paste("~/Desktop/MetaAML_results/Figure_2/",gene_x, "_",gene_y,"_scatterplot.png", sep = ""), dpi = 300, width = 4.5, height = 3, units = "in")
+      ggsave(filename =paste("~/Desktop/MetaAML_results/Figure_2/",gene_x, "_",gene_y,"_scatterplot.pdf", sep = ""),  width = 4.5, height = 3)
     }
   }
 }
@@ -1806,9 +1804,9 @@ for(i in 1:nrow(convergent_genes)){
       
       effect_size = cohens_d(data = sub_dat_final, Variable ~ n)$effsize
       effect_size_ci = cohens_d(data = sub_dat_final, Variable ~ n, ci = TRUE)
-      n_n1 = as.numeric(length(which(sub_dat_final$n == 1)))
-      n_n2 = as.numeric(length(which(sub_dat_final$n == 2)))
-      effect_size_ci = psych::cohen.d.ci(d = effect_size, n = n, n1 = n_n1, n2 = n_n2)
+      # n_n1 = as.numeric(length(which(sub_dat_final$n == 1)))
+      # n_n2 = as.numeric(length(which(sub_dat_final$n == 2)))
+      # effect_size_ci = psych::cohen.d.ci(d = effect_size, n = n, n1 = n_n1, n2 = n_n2)
       
       variable_df <- data.frame(matrix(NA, nrow = 1, ncol = 6))
       names(variable_df) <- c("Variable", "Mutated_Gene", "effect_size", "CI_lower", "CI_upper", "p_value")
@@ -1816,8 +1814,8 @@ for(i in 1:nrow(convergent_genes)){
       variable_df[1,1] <- paste(col_name)
       variable_df[1,2] <- convergent_genes$Gene[i]
       variable_df[1,3] <- effect_size
-      variable_df[1,4] <- effect_size_ci[1,1]
-      variable_df[1,5] <- effect_size_ci[1,3]
+      variable_df[1,4] <- effect_size_ci$conf.low
+      variable_df[1,5] <- effect_size_ci$conf.high
       variable_df[1,6] <- p_val
       
       # Add each list in the loop to a list of lists and rename column
@@ -1938,15 +1936,15 @@ forest_plot_data_list_all$p_text = round(forest_plot_data_list_all$p_text, 3)
 forest_plot_data_list_all$q_text = round(forest_plot_data_list_all$q_text, 2)
 
 for(i in 1:nrow(forest_plot_data_list_all)){
-  if(forest_plot_data_list_all$log_rank_p[i] < 0.01){
-    forest_plot_data_list_all$p_text[i] = "p < 0.01"
-  }
+  # if(forest_plot_data_list_all$log_rank_p[i] < 0.01){
+  #   forest_plot_data_list_all$p_text[i] = "p < 0.01"
+  # }
   if(forest_plot_data_list_all$log_rank_p[i] >= 0.01 & forest_plot_data_list_all$log_rank_p[i] <= 0.05){
     forest_plot_data_list_all$p_text[i] = paste("p =", paste(forest_plot_data_list_all$p_text[i]))
   }
 }
 
-forest_plot_data_list_all$p_q_text = paste(forest_plot_data_list_all$p_text, "; q = ", forest_plot_data_list_all$q_text, sep = "")
+forest_plot_data_list_all$p_q_text = paste("p = ", forest_plot_data_list_all$p_text, "; q = ", forest_plot_data_list_all$q_text, sep = "")
 
 for(i in 1:nrow(forest_plot_data_list_all)){
   if(forest_plot_data_list_all$log_rank_p[i] > 0.05){
@@ -2143,16 +2141,20 @@ forest_plot_data_list_2_all$sig_color = as.factor(forest_plot_data_list_2_all$si
 forest_plot_data_list_2_all = subset(forest_plot_data_list_2_all, forest_plot_data_list_2_all$Upper_CI != "Inf")
 forest_plot_data_list_2_all$categories <- reorder(forest_plot_data_list_2_all$categories, forest_plot_data_list_2_all$HR)
 
-forest_plot_data_list_2_all$p_text = round(as.numeric(forest_plot_data_list_2_all$log_rank_p), 3)
+# forest_plot_data_list_2_all$p_text = round(as.numeric(forest_plot_data_list_2_all$log_rank_p), 3)
+library(scales)
+forest_plot_data_list_2_all$log_rank_p = as.numeric(forest_plot_data_list_2_all$log_rank_p)
+forest_plot_data_list_2_all$p_text_sci = scientific(forest_plot_data_list_2_all$log_rank_p, digits = 2)
+
 forest_plot_data_list_2_all$q_text = as.numeric(round(forest_plot_data_list_2_all$q_val, 2))
 
 for(i in 1:nrow(forest_plot_data_list_2_all)){
   if(forest_plot_data_list_2_all$log_rank_p[i] < 0.05){
-    forest_plot_data_list_2_all$p_text[i] = forest_plot_data_list_2_all$p_text[i]
+    forest_plot_data_list_2_all$p_text[i] = forest_plot_data_list_2_all$p_text_sci[i]
   }
-  if(forest_plot_data_list_2_all$log_rank_p[i] < 0.01){
-    forest_plot_data_list_2_all$p_text[i] = "p < 0.01"
-  }
+  # if(forest_plot_data_list_2_all$log_rank_p[i] < 0.01){
+  #   forest_plot_data_list_2_all$p_text[i] = "p < 0.01"
+  # }
   if(forest_plot_data_list_2_all$q_val[i] < 0.01){
     forest_plot_data_list_2_all$q_text[i] = "q < 0.01"
   }
@@ -2160,14 +2162,14 @@ for(i in 1:nrow(forest_plot_data_list_2_all)){
 
 for(i in 1:nrow(forest_plot_data_list_2_all)){
   if(forest_plot_data_list_2_all$log_rank_p[i] >= 0.01 & forest_plot_data_list_2_all$log_rank_p[i] <= 0.05){
-    forest_plot_data_list_2_all$p_text[i] = paste("p =", paste(forest_plot_data_list_2_all$p_text[i]))
+    forest_plot_data_list_2_all$p_text[i] = paste(forest_plot_data_list_2_all$p_text_sci[i])
   }
   if(forest_plot_data_list_2_all$q_val[i] >= 0.01 & forest_plot_data_list_2_all$q_val[i] <= 0.05){
     forest_plot_data_list_2_all$q_text[i] = paste("q =", paste(forest_plot_data_list_2_all$q_text[i]))
   }
 }
 
-forest_plot_data_list_2_all$p_q_text = paste(forest_plot_data_list_2_all$p_text, "; ", forest_plot_data_list_2_all$q_text, sep = "")
+forest_plot_data_list_2_all$p_q_text = paste("p = ", forest_plot_data_list_2_all$p_text, "; ", forest_plot_data_list_2_all$q_text, sep = "")
 
 for(i in 1:nrow(forest_plot_data_list_2_all)){
   if(forest_plot_data_list_2_all$log_rank_p[i] > 0.05){

@@ -1,8 +1,8 @@
 # ========================================================================================================================================== #
 # Figure_3.R
 # Author : Brooks Benard, bbenard@stanford.edu
-# Date: 08/23/2021
-# Description: This script will perform survival analyses based on VAF thresholds as seen in Figure 3 of the manuscript Benard et al. "Clonal architecture and variant allele frequency correlate with clinical outcomes and drug response in acute myeloid leukemia".
+# Date: 11/02/2021
+# Description: This script will perform survival analyses based on VAF thresholds as seen in Figure 3 of the manuscript Benard et al. "Clonal architecture predicts clinical outcomes and drug sensitivity in acute myeloid leukemia".
 # ========================================================================================================================================== #
 
 # ================ #
@@ -383,6 +383,14 @@ threshold_list_all$Gene <- with(threshold_list_all, reorder(Gene, -VAF_CN_correc
 counts = as.data.frame(table(threshold_list_all$Gene))
 names(counts)[1] = "Gene"
 
+# add n to the plots
+# give.n <- function(x){
+#   return(c(y = 100, label = length(x))) 
+#   # experiment with the multiplier to find the perfect position
+# }
+# number of patients
+n_pts = n_distinct(threshold_list_all$Sample)
+
 p =  ggplot(threshold_list_all, aes(x = Gene, y = VAF_CN_corrected)) +
     # ggtitle("Main Plot Title") +
     ylab("VAF") +
@@ -407,6 +415,7 @@ p =  ggplot(threshold_list_all, aes(x = Gene, y = VAF_CN_corrected)) +
                  colour = "black", 
                  show.legend = FALSE) +
     theme(legend.position="right", axis.text.x = element_text(angle = 45, vjust = 1, hjust = 1))  
+  # stat_summary(fun.data = give.n, geom = "text", fun.y = median)
   ggpar(p, legend.title = "VAF")
 
   ggsave(filename = "~/Desktop/MetaAML_results/Figure_3/MetaAML_vaf_distribution_median_corrected_raincloud.pdf", dpi = 300, width = 10, height = 2.5, units = "in")
@@ -428,6 +437,7 @@ for(i in 1:nrow(sub1)){
 }
 
 genes = data.frame(unique(sub1$Gene))
+
 
 # create directories for binary comparisions
 # binary
@@ -845,7 +855,7 @@ for(i in 1:nrow(genes)){
                                 pval = paste0(p_hr),
                                 test.for.trend = F,
                                 pval.method.size = 3,
-                                pval.coord = c(3, 0.95),
+                                pval.coord = c(2, 0.95),
                                 conf.int = F,
                                 censor = T,
                                 surv.median.line = "none",
@@ -892,7 +902,7 @@ plot_list = list.clean(plot_list)
 
 plots = arrange_ggsurvplots(plot_list, print = FALSE,
                             ncol = 6, nrow = 2)
-ggsave("~/Desktop/MetaAML_results/Figure_3/Supplimental/optimal_VAF_survival_grid.pdf", plots, width = 25, height = 10)
+ggsave("~/Desktop/MetaAML_results/Figure_3/Supplimental/optimal_VAF_survival_grid.pdf", plots, width = 30, height = 10)
 
 # forrest plot of HRs ####
 temp_final_hr = as.data.frame(do.call(rbind, results_list))

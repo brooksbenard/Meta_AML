@@ -1,8 +1,8 @@
 # ========================================================================================================================================== #
 # Data_aggregation.R
 # Author : Brooks Benard, bbenard@stanford.edu
-# Date: 09/30/2021
-# Description: This script will pull published data from AML sequencing studies, homogenize annotations and coding where possible for Benard et al. "Clonal architecture and variant allele frequency correlate with clinical outcomes and drug response in acute myeloid leukemia".
+# Date: 11/02/2021
+# Description: This script will pull published data from AML sequencing studies, homogenize annotations and coding where possible for Benard et al. "Clonal architecture predicts with clinical outcomes and drug sensitivity in acute myeloid leukemia".
 # ========================================================================================================================================== #
 
 # ================ #
@@ -25,6 +25,8 @@ invisible(lapply(packages, library, character.only = TRUE))
 # =============================== #
 dir.create("~/Desktop/MetaAML_results/raw_data")
 setwd("~/Desktop/MetaAML_results/raw_data")
+
+
 
 # ========================================================================================== #
 # Using the different datasets, create a single matrix containing all patients and variables
@@ -128,8 +130,6 @@ pt_subset_2 <- dplyr::select(pt_subset_2, LabId, Subset, PatientId, specimenType
 colnames(pt_subset_2)[1] <- "labId"
 
 
-# VAF correction ####
-# correct the VAFs based on reported cytogenetic data per patient
 # read in BeatAML variants for analysis'
 BeatAML_variants <- read_excel("~/Desktop/MetaAML_results/raw_data/41586_2018_623_MOESM3_ESM.xlsx", sheet = 7, col_names = TRUE)
 
@@ -1087,7 +1087,11 @@ azizi_data$VAF = as.numeric(azizi_data$VAF)
 
 azizi_data$VAF = azizi_data$VAF*100
 
-azizi_data$Cohort = azizi_data$Cohort[azizi_data$Cohort == "Grief"] <- "Greif"
+for(i in 1:nrow(azizi_data)){
+  if(azizi_data$Cohort[i] == "Grief"){
+    azizi_data$Cohort[i] == "Greif"
+  }
+}
 
 final_data_matrix <- rbind.fill(final_data_matrix, azizi_data)
 
@@ -1340,7 +1344,10 @@ for(i in 1:nrow(final_data_matrix)){
   }
 }
 
-# dplyr::select final columns and save the data frame
+# remove unwanted studies
+final_data_matrix = final_data_matrix %>%
+  subset(Cohort %in% c("Majeti", "TCGA", "Tyner", "Papaemmanuil", "Welch", "Lindsley", "Au", "Wang", "Garg", "Greif", "Huet", "Hirsch"))
+
 
 final_data_matrix =  final_data_matrix %>%
   dplyr::select(Sample,Gene,VAF,variant_type,amino_acid_change,Subset,PatientId,specimenType,Cohort,Censor,Time_to_OS,Sex,Age,Cytogenetics,Risk,BM_blast_percent,PB_blast_percent,WBC,Hemoglobin,LDH,Platelet,PB_wbc_percent,mut_freq_gene,mut_freq_pt,mut_freq_bin,VAF_male_x,mutation_category, FAB)
@@ -1366,6 +1373,7 @@ published_samples = rbind(CD_pub, NatGen_pub) %>%
 
 final_data_matrix = final_data_matrix %>%
   subset(Sample %in% published_samples$Stanford_ID | Cohort != "Majeti")
+
 save(final_data_matrix,  file = "~/Desktop/MetaAML_results/final_data_matrix.RData")
 
 write.csv(final_data_matrix,  file = "~/Desktop/MetaAML_results/final_data_matrix.csv")

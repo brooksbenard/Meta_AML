@@ -1,8 +1,8 @@
 # ========================================================================================================================================== #
 # Figure_4.R
 # Author : Brooks Benard, bbenard@stanford.edu
-# Date: 08/23/2021
-# Description: This script analyzes pairwise mutation VAF relationships, mutation ordering in AML, and survival associations based on the ordering of pairwise and category ordering as seen in Figure 4 of the manuscript Benard et al. "Clonal architecture and variant allele frequency correlate with clinical outcomes and drug response in acute myeloid leukemia".
+# Date: 11/02/2021
+# Description: This script analyzes pairwise mutation VAF relationships, mutation ordering in AML, and survival associations based on the ordering of pairwise and category ordering as seen in Figure 4 of the manuscript Benard et al. "Clonal architecture predicts clinical outcomes and drug sensitivity in acute myeloid leukemia".
 # ========================================================================================================================================== #
 
 # ================ #
@@ -498,7 +498,7 @@ c = ggplot(sub, aes(y = Gene,  x = VAF_CN_corrected, fill = mutation_category, h
   scale_fill_manual(name = "", values = c("DNA Methylation" = "#374E55FF", "Chromatin/Cohesin" = "#DF8F44FF", "RTK/RAS Signaling" = "#00A1D5FF", "Splicing" = "#B24745FF", "Transcription" = "#79AF97FF", "NPM1" = "#80796BFF", "Tumor suppressors" = "#6A6599FF")) +
   theme(legend.position = "none")  
 
-ggsave(filename = "~/Desktop/MetaAML_results/Figure_4/vaf_distribution_order_by_time.png", dpi = 300, width = 5, height = 5, units = "in")
+ggsave(filename = "~/Desktop/MetaAML_results/Figure_4/vaf_distribution_order_by_time.pdf",  width = 5, height = 5)
 
 ggarrange(a,                                         
           ggarrange(c, b, ncol = 2),
@@ -615,7 +615,7 @@ vaf_scatterplot_function <- function(pt_subset, gene_1_2, save_plot){
     print(scatter_plot)
     
     if(save_plot == T){
-      ggsave(filename =paste("~/Desktop/MetaAML_results/Figure_4/",gene_x, "_",gene_y,"_scatterplot.png", sep = ""), dpi = 300, width = 4.25, height = 3, units = "in")
+      ggsave(filename =paste("~/Desktop/MetaAML_results/Figure_4/",gene_x, "_",gene_y,"_scatterplot.pdf", sep = ""),width = 4.25, height = 3)
     }
   }
 }
@@ -698,43 +698,42 @@ for(i in 1:nrow(genes)){
       model <- coxph( Surv(Time_to_OS.x, Censor.x) ~ Clonality,
                       data = gene_1_and_2 )
       
-      
-      # # # plots the survival
-      # surv_plot <- ggsurvplot(OS,
-      #                         data = final,
-      #                         log = (OS),
-      #                         log.rank.weights = c("survdiff"),
-      #                         pval = p_val,
-      #                         test.for.trend = F,
-      #                         pval.method.size = 3,
-      #                         pval.coord = c(0, 0),
-      #                         conf.int = F,
-      #                         censor = T,
-      #                         surv.median.line = "none",
-      #                         risk.table = T,
-      #                         risk.table.title = "Number at risk",
-      #                         risk.table.fontsize = 4,
-      #                         risk.table.height = .3,
-      #                         risk.table.y.text = F,
-      #                         break.time.by = 5,
-      #                         risk.table.pos = c("out"),
-      #                         palette = cat_colors,
-      #                         xlab = "Years",
-      #                         ylim = c(0, 1.0),
-      #                         ylab =  "Survival Probability",
-      #                         font.main = c(15, "plain", "#252525"),
-      #                         pval.size = 4,
-      #                         font.x = c(12, "plain", "#252525"),
-      #                         font.y =  c(12, "plain", "#252525"),
-      #                         font.legend = c(12, "plain"),
-      #                         font.tickslab = c(12, "plain", "#252525"),
-      #                         legend.labs = comparisons,
-      #                         legend.title = 'Mutation order',
-      #                         legend = "none",
-      #                         linetype = c("solid", "dashed", "solid"),
-      #                         ggtheme = theme_cowplot())
-      # 
-      # plot_list[[j]] = surv_plot
+      # # plots the survival
+      surv_plot <- ggsurvplot(OS,
+                              data = gene_1_and_2,
+                              log = (OS),
+                              log.rank.weights = c("survdiff"),
+                              pval = 0.002,
+                              test.for.trend = F,
+                              pval.method.size = 3,
+                              pval.coord = c(0, 0),
+                              conf.int = F,
+                              censor = T,
+                              surv.median.line = "none",
+                              risk.table = T,
+                              risk.table.title = "Number at risk",
+                              risk.table.fontsize = 4,
+                              risk.table.height = .3,
+                              risk.table.y.text = F,
+                              break.time.by = 5,
+                              risk.table.pos = c("out"),
+                              # palette = cat_colors,
+                              xlab = "Years",
+                              ylim = c(0, 1.0),
+                              ylab =  "Survival Probability",
+                              font.main = c(15, "plain", "#252525"),
+                              pval.size = 4,
+                              font.x = c(12, "plain", "#252525"),
+                              font.y =  c(12, "plain", "#252525"),
+                              font.legend = c(12, "plain"),
+                              font.tickslab = c(12, "plain", "#252525"),
+                              legend.labs = comparisons,
+                              legend.title = 'Mutation order',
+                              legend = "none",
+                              linetype = c("solid", "dashed", "solid"),
+                              ggtheme = theme_cowplot())
+
+      plot_list[[j]] = surv_plot
       # 
       # print(surv_plot)
       # png(filename = paste("~/Desktop/MetaAML_results/Figure_4/survival_by_muation_category_ordering/pngs/",g1,"_",g2, ".png", sep = ""), res = 300, width = 4, height = 2.4, units = "in")
@@ -837,7 +836,7 @@ write_csv(temp_final_hr, "~/Desktop/MetaAML_results/Figure_4/gene_order_hr_fores
 # because there are still too few cases on a pairwise basis to perform survival analysis, I will now look at pairwise occurence more broadly in terms of mutation categories
 
 dir.create("~/Desktop/MetaAML_results/Figure_4/survival_by_muation_category_ordering")
-dir.create("~/Desktop/MetaAML_results/Figure_4/survival_by_muation_category_ordering/pngs")
+dir.create("~/Desktop/MetaAML_results/Figure_4/survival_by_muation_category_ordering/pdfs")
 
 load("~/Desktop/MetaAML_results/final_data_matrix_2.RData")
 final_data_matrix_sub <- subset(final_data_matrix_2, final_data_matrix_2$Subset == "de_novo")
@@ -989,18 +988,24 @@ for(j in 1:nrow(mut_cat)){
                             font.tickslab = c(12, "plain", "#252525"),
                             legend.labs = comparisons,
                             legend.title = 'Mutation order',
-                            legend = "none",
+                            legend = "right",
                             linetype = c("solid", "dashed", "solid"),
                             ggtheme = theme_cowplot())
 
     plot_list[[j]] = surv_plot
 
-    print(surv_plot)
-    png(filename = paste("~/Desktop/MetaAML_results/Figure_4/survival_by_muation_category_ordering/pngs/",g1,"_",g2, ".png", sep = ""), res = 300, width = 3.5, height = 3.5, units = "in")
-    #
-    surv_plot
-    print(surv_plot)
+    pdf(paste("~/Desktop/MetaAML_results/Figure_4/survival_by_muation_category_ordering/pdfs/",g1,"_",g2, "2.pdf", sep = ""), width = 6, height = 3.5)
+    print(surv_plot, newpage = FALSE)
     dev.off()
+    
+    
+    
+    # print(surv_plot)
+    # png(filename = paste("~/Desktop/MetaAML_results/Figure_4/survival_by_muation_category_ordering/pngs/",g1,"_",g2, ".png", sep = ""), res = 300, width = 3.5, height = 3.5, units = "in")
+    # #
+    # surv_plot
+    # print(surv_plot)
+    # dev.off()
     
   }
 }
@@ -1208,5 +1213,5 @@ p = cowplot::plot_grid(plotlist = sc_plots,
                        rel_heights = c(1,1),
                        rel_widths = c(1,1))
 
-ggsave(filename ="~/Desktop/MetaAML_results/Figure_4/Supplimental/VAF_scatterplot_matrix.png", dpi = 150, width = 17, height = 22, units = "in")
+ggsave(filename ="~/Desktop/MetaAML_results/Figure_4/Supplimental/VAF_scatterplot_matrix.pdf", width = 17, height = 22, units = "in")
 

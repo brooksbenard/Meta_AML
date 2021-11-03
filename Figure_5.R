@@ -1,9 +1,9 @@
 # ========================================================================================================================================== #
 # Figure_5.R
 # Author : Brooks Benard and Logan Leak, bbenard@stanford.edu; lleak@stanford.edu
-# Date: 08/23/2021
+# Date: 11/02/2021
 # Description: This script performes clonal analysis using PyClone and ClonEvol on aggregate TCGA and Beat AML samples
-# This script will download, process, and generate the restults as seen in Figure 5 (and associated suppliments) of the manuscript Benard et al. "Clonal architecture and variant allele frequency correlate with clinical outcomes and drug response in acute myeloid leukemia".
+# This script will download, process, and generate the restults as seen in Figure 5 (and associated suppliments) of the manuscript Benard et al. "Clonal architecture predicts clinical outcomes and drug sensitivity in acute myeloid leukemia".
 # ========================================================================================================================================== #
 
 
@@ -1813,14 +1813,7 @@ for (i in 1:length(unique(data_for_plot$PATIENT_ID))) {
 
 
 ## Branched trajectories
-# 
-# generous assignment (including mixed trajectory models)
-# vaf_branched <- c("12-00127", "13-00204", "13-00226", "13-00342", "13-00417", "13-00420", "13-00540", "13-0563", "13-00615", "13-00625", "14-00034", "14-00092", "14-00272", "14-00329", "14-00404", "14-00473", "14-00564", "15-00073", "15-00300", "15-00361", "15-00471", "15-00572", "15-00595", "15-00614", "15-00655", "15-00724", "15-00726", "15-00782", "15-00898", "16-00027", "16-00035", "16-00067", "16-00129", "16-00220", "16-01121", "16-01219", "TCGA-AB-2803", "TCGA-AB-2804", "TCGA-AB-2805", "TCGA-AB-2808", "TCGA-AB-2814", "TCGA-AB-2822", "TCGA-AB-2828", "TCGA-AB-2894", "TCGA-AB-2899", "TCGA-AB-2900", "TCGA-AB-2904", "TCGA-AB-2908", "TCGA-AB-2916", "TCGA-AB-2920", "TCGA-AB-2926", "TCGA-AB-2939", "TCGA-AB-2959", "TCGA-AB-2969", "TCGA-AB-2970", "TCGA-AB-2988", "TCGA-AB-2989", "TCGA-AB-3012")
-
-# # out of curriosity, these are the curated branched samples using cellular prevalence instead of VAF
-# cp_branched <- c("12-00127", "14-00272", "14-00404", "15-00073", "15-00595", "15-00724", "16-00035", "16-01151", "TCGA-AB-2802", "TCGA-AB-2808", "TCGA-AB-2817", "TCGA-AB-2830", "TCGA-AB-2897", "TCGA-AB-2924", "TCGA-AB-2965", "TCGA-AB-2969", "TCGA-AB-2978")
-# 
-# branched <- union(vaf_branched, cp_branched)
+# types of archetecture were assessed manually by looking at the various ClonEvol models generated from the analysis
 
 # stringent assignment
 vaf_branched <- c("12-00127", "13-00540", "13-00563", "13-00625", "14-00272", "14-00329", "14-00404", "14-00473", "14-00564", "14-00632", "15-00073", "15-00361", "15-00572", "15-00595", "15-00724", "15-00726", "15-00898", "16-00035", "16-00220", "16-00525", "16-01151", "16-01219", "TCGA-AB-2803", "TCGA-AB-2808", "TCGA-AB-2814", "TCGA-AB-2828", "TCGA-AB-2897", "TCGA-AB-2900", "TCGA-AB-2916", "TCGA-AB-2959", "TCGA-AB-2969", "TCGA-AB-3012")
